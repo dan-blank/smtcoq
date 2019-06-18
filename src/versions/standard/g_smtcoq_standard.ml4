@@ -35,6 +35,13 @@ VERNAC COMMAND EXTEND Vernac_zchaff CLASSIFIED AS QUERY
   ]
 END
 
+VERNAC COMMAND EXTEND Vernac_smtinterpol CLASSIFIED AS QUERY
+| [ "Smtinterpol_Checker" string(fsmt) string(fproof) ] ->
+  [
+    Smtinterpol.checker fsmt fproof
+  ]
+END
+
 VERNAC COMMAND EXTEND Vernac_verit CLASSIFIED AS QUERY
 | [ "Parse_certif_verit"
     ident(t_i) ident(t_func) ident(t_atom) ident(t_form) ident(root) ident(used_roots) ident(trace) string(fsmt) string(fproof) ] ->

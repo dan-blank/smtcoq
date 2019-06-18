@@ -26,6 +26,7 @@
 -I trace
 -I verit
 -I zchaff
+-I smtinterpol
 -I versions/standard
 -I versions/standard/Int63
 -I versions/standard/Array
@@ -126,6 +127,8 @@ zchaff/zchaff.ml
 zchaff/zchaff.mli
 zchaff/zchaffParser.ml
 zchaff/zchaffParser.mli
+
+smtinterpol/smtinterpol.ml
 
 cnf/Cnf.v
 
