@@ -129,6 +129,12 @@ zchaff/zchaffParser.ml
 zchaff/zchaffParser.mli
 
 smtinterpol/smtinterpol.ml
+smtinterpol/smtinterpolParser.ml
+smtinterpol/smtinterpolParser.mli
+smtinterpol/smtinterpolLexer.ml
+smtinterpol/smtinterpolLexer.mli
+smtinterpol/smtinterpolSyntax.ml
+smtinterpol/smtinterpolSyntax.mli
 
 cnf/Cnf.v
 

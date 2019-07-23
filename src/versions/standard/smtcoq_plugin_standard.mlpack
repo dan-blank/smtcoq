@@ -50,6 +50,10 @@ Verit
 
 Lfsc
 
+SmtinterpolSyntax
+SmtinterpolParser
+SmtinterpolLexer
+
 Smtinterpol
 
 G_smtcoq
