@@ -9,7 +9,7 @@ let import_trace proof =
   let chan = open_in proof in
   let lexbuf = Lexing.from_channel chan in
   let is_first = ref true in
-  let confl_num = ref SmtinterpolSyntax.Dummy in
+  let confl_num = ref SmtinterpolSyntax.PlaceholderTerm in
   let first_num = ref (-1) in
   let line = ref (1) in
   try

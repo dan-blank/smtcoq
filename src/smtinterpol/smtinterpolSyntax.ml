@@ -12,11 +12,16 @@ attribute ::= keywordNoAttr:k attributeValue?:v
 type annotation = Annotation of string * string
 
 (*
+A SMTLib-Sort. Since we don't do typechecking yet, we currently ignore proper parsing and handling of sorts.
+
 Represents
 sort ::= identifier:id {: ... :}
       | LPAR identifier:id sort+:sorts RPAR
 *)
-type sort = Sort of string * sort list * int list option
+type sort =
+  | Sort of string * sort list * int list option
+  (* Placeholders for proper sorts that could be support later on when typechecking.  *)
+  | Placeholdersort
 
 (*
 A constant term that is either numerical (which kind of number is encoded in the sort) or a string.
@@ -29,7 +34,10 @@ constantTerm ::= NUMERAL:n {: ... :}
              | STRING:n {: ... :}
 *)
 type constant_term =
-  | Numerical of int * sort
+  | Numerical of Big_int.big_int
+  | Decimal of string
+  | Hexadecimal of string 
+  | Binary of string 
   | String of string
 
 (*
@@ -63,7 +71,7 @@ type term =
   | LetTerm of term_variable list * term list * term * sort
   | TermVariable of string * sort
   | QuantifiedFormula of quantifier * term_variable list * term
-
+  | PlaceholderTerm (* TODO For development purposes, delete when confl_number is treated correctly *)
 (*
 Represents
 qualIdentifier ::= identifier:i
