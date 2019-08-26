@@ -1,6 +1,10 @@
 {
   open SmtinterpolParser
   exception Eof
+  (*
+      todo is problematic? : indentifier = symbol
+
+  *)
 }
 
 let alpha = [ 'a'-'z' 'A' - 'Z' ]
@@ -11,8 +15,11 @@ let digit = '0' | non_zero_leading_digit
 let numeral = '0' | non_zero_leading_digit digit*
 let hexadecimal = "#x" [ '0' - '9' 'a'-'f' 'A'-'F']+
 let binary = "#b" [ '0' '1' ]+
-(* TODO add proper string handling *)
 let string = (alpha|digit|blank)*
+let symbolchars = ['~''!''@''$''%''^''&''*''_''-''+''=''<''>''.''?''/']
+let symbol = (alpha|digit|symbolchars)+
+let index = numeral|symbol
+let identifier = symbol
 
 rule token = parse
   | blank +   { token lexbuf }
@@ -20,8 +27,9 @@ rule token = parse
   | ":"       { COLON }
   | "("       { LPAR }
   | ")"       { RPAR }
-  | (numeral as n){ NUMERAL (Big_int.big_int_of_string n)}
+  | (numeral as n){ NUMERAL n}
   | (hexadecimal as h) { HEXADECIMAL h} 
   | (binary as b) { BINARY b}
   | '"' (string as s) '"' { STRING s }
+  | symbol as s { SYMBOL s }
   | eof       { raise Eof }

@@ -5,6 +5,7 @@ open SmtTrace
 open SatAtom
 open SmtMisc
 
+
 let import_trace proof =
   let chan = open_in proof in
   let lexbuf = Lexing.from_channel chan in
@@ -24,17 +25,27 @@ let import_trace proof =
   with
     | SmtinterpolLexer.Eof ->
       close_in chan;
-      Printf.printf "We are in import_trace and parsing was successfull!"
+      (* Printf.printf "Parsing was successfull!"*)
     | Parsing.Parse_error -> failwith ("Smtinterpol.import_trace: parsing error line "^(string_of_int !line)^" File was "^proof)
 
 let import_all fsmt proof =
   import_trace proof
+
+let simple_test_parser =
+  import_trace "../examples/parsertest_simple_string.smt2";
+  import_trace "../examples/parsertest_simple_numerical.smt2";
+  import_trace "../examples/parsertest_simple_decimal.smt2";
+  import_trace "../examples/parsertest_simple_hexadecimal.smt2";
+  import_trace "../examples/parsertest_simple_binary.smt2";
+  Printf.printf "Simple parser tests completed successfully. \n"
+
 
 (*
 Take an SMT2-formula and an SMTInterpol-proof and check whether the proof proves the formula unsatisfiable.
 This function is called when Coq calls the vernacular command 'Smtinterpol.checker'.
 *)
 let checker formula proof=
+  simple_test_parser;
   import_all None proof;
   let dummy = SmtBtype.create () in (* Make sure that we can use other modules. *)
   let rt = SmtBtype.create () in
