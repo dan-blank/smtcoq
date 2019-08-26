@@ -7,9 +7,10 @@
 %token LPAR RPAR
 %token <string> NUMERAL HEXADECIMAL BINARY DECIMAL STRING SYMBOL
 
-%token UNDERSCORE
+%token UNDERSCORE EXCLAMATIONMARK
 %token FORALL EXISTS
 %token LET AS
+%token QUOTEDLA PIVOT IMPTOOR
 
 %type <SmtinterpolSyntax.term> line
 
@@ -81,12 +82,62 @@ quantifier:
   | EXISTS { SmtinterpolSyntax.ExistsQuantifier }
 ;
 
-term :
+reserved_symbols:
+  | QUOTEDLA { SmtinterpolSyntax.KWQuotedLA }
+  | PIVOT { SmtinterpolSyntax.KWPivot }
+  | IMPTOOR { SmtinterpolSyntax.KWImpToOr }
+;
+
+keyword:
+  | COLON reserved_symbols { $2 }
+;
+
+atom:
+  | constant_term { SmtinterpolSyntax.ConstantAtom $1 }
+  | SYMBOL { SmtinterpolSyntax.SymbolAtom $1 }
+  | keyword { SmtinterpolSyntax.KeywordAtom $1 }
+;
+
+sexpr:
+  | atom { SmtinterpolSyntax.AtomSexpr $1 }
+  | list { SmtinterpolSyntax.NestedSexpr $1 }
+;
+
+list:
+  | LPAR RPAR { [] }
+  | LPAR sexpr_list RPAR { $2 }
+  | LPAR sexpr_list sexpr RPAR { $2@[$3] }
+;
+
+sexpr_list:
+  | sexpr { [$1] }
+  | sexpr_list sexpr { $1@[$2] }
+;
+
+attribute_value:
+  | constant_term { SmtinterpolSyntax.ConstantValue $1 }
+  | SYMBOL { SmtinterpolSyntax.SymbolValue $1 }
+  | LPAR sexpr_list RPAR { SmtinterpolSyntax.NestedSexprValue $2 }
+;
+ 
+
+attribute:
+  | keyword { SmtinterpolSyntax.EmptyAttribute $1 }
+  | keyword attribute_value { SmtinterpolSyntax.NonEmptyAttribute ($1, $2) }
+;
+
+attribute_list:
+  | attribute { [$1] }
+  | attribute attribute_list { $1 :: $2 }
+;
+
+term:
   | constant_term { SmtinterpolSyntax.ConstantTerm $1 }
   | LPAR LET LPAR var_binding_list RPAR term RPAR { SmtinterpolSyntax.LetTerm ($4, $6) }
   | qual_identifier { SmtinterpolSyntax.VariableTerm $1 }
   | LPAR qual_identifier term_list RPAR { SmtinterpolSyntax.ApplicationTerm ($2, $3) }
   | LPAR quantifier LPAR sorted_var_list RPAR term RPAR { SmtinterpolSyntax.QuantifiedFormula ($2, $4, $6) }
+  | LPAR EXCLAMATIONMARK term attribute_list RPAR { SmtinterpolSyntax.AnnotatedTerm ($3, $4) }
 ;
 
 term_list:

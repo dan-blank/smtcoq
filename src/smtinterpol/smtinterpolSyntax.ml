@@ -22,17 +22,29 @@ type spec_constant =
 type sorted_var = SortedVar of string * sort
 
 type keyword =
-  | Dummykewyword
+  | KWQuotedLA
+  | KWPivot
+  | KWImpToOr
 
+type atom =
+  | ConstantAtom of spec_constant
+  | SymbolAtom of string
+  | KeywordAtom of keyword
+
+
+
+type sexpr =
+  | AtomSexpr of atom
+  | NestedSexpr of sexpr list
 
 type attribute_value =
   | ConstantValue of spec_constant
   | SymbolValue of string
-  | SexprValue of string
+  | NestedSexprValue of sexpr list
 
 type attribute =
   | EmptyAttribute of keyword
-  | NonEmptyAttibute of keyword * attribute_value list
+  | NonEmptyAttribute of keyword * attribute_value
 
 type quantifier = ForallQuantifier | ExistsQuantifier
 

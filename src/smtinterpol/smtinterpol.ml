@@ -56,13 +56,16 @@ let simple_quantified_tests =
   import_trace "../examples/parsertest_simple_quantified_forall.smt2";
   import_trace "../examples/parsertest_simple_quantified_exists.smt2";
   Printf.printf "Simple quantified term parser tests completed successfully. \n"
+let simple_annotated_tests =
+  import_trace "../examples/parsertest_simple_annotated_onesimpleannotation.smt2";
+  import_trace "../examples/parsertest_simple_annotated_onecomplexannotation.smt2";
+  import_trace "../examples/parsertest_simple_annotated_nested.smt2";
+  Printf.printf "Simple annotated term parser tests completed successfully. \n"
 (*
 Take an SMT2-formula and an SMTInterpol-proof and check whether the proof proves the formula unsatisfiable.
 This function is called when Coq calls the vernacular command 'Smtinterpol.checker'.
 *)
 let checker formula proof=
-  simple_constant_tests;
-  simple_let_tests;
   import_all None proof;
   let dummy = SmtBtype.create () in (* Make sure that we can use other modules. *)
   let rt = SmtBtype.create () in
