@@ -1,0 +1,1 @@
+(forall ( (aSymbol aSort) (anotherSymbol anotherSort) ) 5)

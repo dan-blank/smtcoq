@@ -22,8 +22,7 @@ type spec_constant =
 type sorted_var = SortedVar of string * sort
 
 type keyword =
-  | Forall
-  | Exists
+  | Dummykewyword
 
 
 type attribute_value =
@@ -35,15 +34,18 @@ type attribute =
   | EmptyAttribute of keyword
   | NonEmptyAttibute of keyword * attribute_value list
 
-type quantifier = Forall | Exists
+type quantifier = ForallQuantifier | ExistsQuantifier
+
+type qualified_identifier =
+  | QualifiedIdentifier of identifier * sort option
 
 type term =
   | ConstantTerm of spec_constant
   | AnnotatedTerm of term * attribute list
-  | ApplicationTerm of identifier * sort option * term list 
+  | ApplicationTerm of qualified_identifier * term list 
   | LetTerm of var_binding list * term
 (* Note: According to the specification, "To simplify sort checking, a function symbolin a term can be annotated with one of its result sorts", so this should rather be an optional sort *)
-  | VariableTerm of identifier * sort option
+  | VariableTerm of qualified_identifier 
   | QuantifiedFormula of quantifier * sorted_var list * term
   | PlaceholderTerm (* TODO For development purposes, delete when confl_number is treated correctly *)
 and

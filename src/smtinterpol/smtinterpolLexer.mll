@@ -34,6 +34,8 @@ rule token = parse
   | (binary as b) { BINARY b}
   | "let" { LET }
   | "as" { AS }
+  | "exists" { EXISTS }
+  | "forall" { FORALL }
   | '"' (string as s) '"' { STRING s }
   | symbol as s { SYMBOL s }
   | eof       { raise Eof }

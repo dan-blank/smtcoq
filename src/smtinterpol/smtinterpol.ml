@@ -48,6 +48,14 @@ let simple_variable_tests =
   import_trace "../examples/parsertest_simple_variable_withsort.smt2";
   import_trace "../examples/parsertest_simple_variable_withoutsort.smt2";
   Printf.printf "Simple variable term parser tests completed successfully. \n"
+let simple_application_tests =
+  import_trace "../examples/parsertest_simple_application_oneterm.smt2";
+  import_trace "../examples/parsertest_simple_application_twoterms.smt2";
+  Printf.printf "Simple application term parser tests completed successfully. \n"
+let simple_quantified_tests =
+  import_trace "../examples/parsertest_simple_quantified_forall.smt2";
+  import_trace "../examples/parsertest_simple_quantified_exists.smt2";
+  Printf.printf "Simple quantified term parser tests completed successfully. \n"
 (*
 Take an SMT2-formula and an SMTInterpol-proof and check whether the proof proves the formula unsatisfiable.
 This function is called when Coq calls the vernacular command 'Smtinterpol.checker'.
