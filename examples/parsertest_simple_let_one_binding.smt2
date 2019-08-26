@@ -1,0 +1,1 @@
+(let ( (aSymbol "aStringAndHenceATerm") ) 4 )

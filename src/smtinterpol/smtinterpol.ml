@@ -31,21 +31,30 @@ let import_trace proof =
 let import_all fsmt proof =
   import_trace proof
 
-let simple_test_parser =
+let simple_constant_tests =
   import_trace "../examples/parsertest_simple_string.smt2";
   import_trace "../examples/parsertest_simple_numerical.smt2";
   import_trace "../examples/parsertest_simple_decimal.smt2";
   import_trace "../examples/parsertest_simple_hexadecimal.smt2";
   import_trace "../examples/parsertest_simple_binary.smt2";
-  Printf.printf "Simple parser tests completed successfully. \n"
+  Printf.printf "Simple constant term parser tests completed successfully. \n"
 
+let simple_let_tests =
+  import_trace "../examples/parsertest_simple_let_one_binding.smt2";
+  import_trace "../examples/parsertest_simple_let_onelevelnested.smt2";
+  Printf.printf "Simple let term parser tests completed successfully. \n"
 
+let simple_variable_tests =
+  import_trace "../examples/parsertest_simple_variable_withsort.smt2";
+  import_trace "../examples/parsertest_simple_variable_withoutsort.smt2";
+  Printf.printf "Simple variable term parser tests completed successfully. \n"
 (*
 Take an SMT2-formula and an SMTInterpol-proof and check whether the proof proves the formula unsatisfiable.
 This function is called when Coq calls the vernacular command 'Smtinterpol.checker'.
 *)
 let checker formula proof=
-  simple_test_parser;
+  simple_constant_tests;
+  simple_let_tests;
   import_all None proof;
   let dummy = SmtBtype.create () in (* Make sure that we can use other modules. *)
   let rt = SmtBtype.create () in

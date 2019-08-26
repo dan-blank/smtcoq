@@ -1,16 +1,14 @@
 %{
-    open SmtBtype
-    open SmtAtom
-    open SmtForm
     open SmtinterpolSyntax
 %}
 
 %token EOL
 %token COLON
 %token LPAR RPAR
-%token <string> NUMERAL HEXADECIMAL BINARY STRING SYMBOL
+%token <string> NUMERAL HEXADECIMAL BINARY DECIMAL STRING SYMBOL
 
 %token UNDERSCORE
+%token LET AS
 
 %type <SmtinterpolSyntax.term> line
 %type <string> index
@@ -56,8 +54,20 @@ sort:
   | LPAR identifier sort_list RPAR {SmtinterpolSyntax.AppliedSort ($2, $3) }
 ;
 
+var_binding:
+  | LPAR SYMBOL term RPAR { SmtinterpolSyntax.VarBinding ($2, $3) }
+;
+
+var_binding_list:
+  | var_binding var_binding_list { $1 :: $2 }
+  | var_binding { [$1] }
+;
+
 term :
   | constant_term { SmtinterpolSyntax.ConstantTerm $1 }
+  | LPAR LET LPAR var_binding_list RPAR term RPAR { SmtinterpolSyntax.LetTerm ($4, $6) }
+  | identifier { SmtinterpolSyntax.VariableTerm ($1, None)}
+  | LPAR AS identifier sort RPAR { SmtinterpolSyntax.VariableTerm ($3, Some $4)}
 ;
 
 
