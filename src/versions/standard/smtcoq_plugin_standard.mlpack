@@ -32,6 +32,10 @@ VeritSyntax
 VeritParser
 VeritLexer
 
+SmtinterpolSyntax
+SmtinterpolParser
+SmtinterpolLexer
+
 Shashcons
 Hstring
 Type
@@ -50,10 +54,7 @@ Verit
 
 Lfsc
 
-SmtinterpolSyntax
-SmtinterpolParser
-SmtinterpolLexer
-
 Smtinterpol
+
 
 G_smtcoq

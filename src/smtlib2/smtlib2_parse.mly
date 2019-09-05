@@ -24,6 +24,7 @@
 %}
 
 %start main
+%start mainterm
 %start term
 %start sort
 
@@ -72,6 +73,7 @@
 
 
 %type <Smtlib2_ast.commands option> main
+%type <Smtlib2_ast.term> mainterm
 %type <Smtlib2_ast.an_option> an_option
 %type <Smtlib2_ast.attribute> attribute
 %type <Smtlib2_ast.attributevalue> attributevalue
@@ -103,6 +105,10 @@
 /* %type <Smtlib2_ast.termqualidterm_term_term56> termqualidterm_term_term56 */
 /* %type <Smtlib2_ast.idunderscoresymnum_identifier_numeral33> idunderscoresymnum_identifier_numeral33 */
 %%
+
+mainterm:
+| term EOF { $1 }
+;
 
 main:
 | commands { Some($1) }

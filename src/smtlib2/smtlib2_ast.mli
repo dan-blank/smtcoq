@@ -95,3 +95,4 @@ val loc_term : term -> loc
 val loc_varbinding : varbinding -> loc
 val loc_couple : 'a * 'b -> 'a
 val loc_of : commands -> loc
+val print_term : Format.formatter -> term -> unit

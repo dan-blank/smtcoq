@@ -6,9 +6,8 @@
 
   *)
 }
-
 let alpha = [ 'a'-'z' 'A' - 'Z' ]
-let blank = [' ' '\t']
+let ws = [' ' '\t']
 let newline = ['\n' '\r']
 let non_zero_leading_digit = [ '1' -'9' ]
 let digit = '0' | non_zero_leading_digit
@@ -16,14 +15,14 @@ let numeral = '0' | non_zero_leading_digit digit*
 let decimal = numeral '.' '0'* numeral
 let hexadecimal = "#x" [ '0' - '9' 'a'-'f' 'A'-'F']+
 let binary = "#b" [ '0' '1' ]+
-let string = (alpha|digit|blank)*
+let string = (alpha|digit|ws)*
 let symbolchars = ['~''!''@''$''%''^''&''*''_''-''+''=''<''>''.''?''/']
 let symbol = (alpha|digit|symbolchars)+
 let index = numeral|symbol
 let identifier = symbol
 
 rule token = parse
-  | blank +   { token lexbuf }
+  | ws +   { token lexbuf }
   | newline + { EOL }
   | ":"       { COLON }
   | "("       { LPAR }
