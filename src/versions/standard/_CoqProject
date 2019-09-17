@@ -129,6 +129,9 @@ zchaff/zchaffParser.ml
 zchaff/zchaffParser.mli
 
 smtinterpol/smtinterpol.ml
+smtinterpol/prooftree_ast.ml
+smtinterpol/smttransformation.ml
+smtinterpol/modified_smtlib2_printing.ml
 smtinterpol/smtinterpolParser.ml
 smtinterpol/smtinterpolParser.mli
 smtinterpol/smtinterpolLexer.ml

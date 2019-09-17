@@ -256,6 +256,7 @@ specconstant:
 
 symbol:
 | SYMBOL { Symbol(loc (), $1) }
+| EXCLIMATIONPT { Symbol(loc (), "!") }
 | ASCIIWOR { SymbolWithOr(loc (), $1) }
 ;
 
