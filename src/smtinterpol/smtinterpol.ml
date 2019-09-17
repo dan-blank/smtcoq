@@ -21,13 +21,14 @@ let simple_constant_tests =
   let smt_term = import_trace "smtinterpol/rl_full_complex.scm" in
   (* let smt_term = import_trace "../examples/rl_full_trivial.smt2" in *)
   (* let translated_term = smt_to_internal_clause_proof smt_term in *)
-  let visited_term = visit_term smt_term in
-  let formater = Format.str_formatter in
-  print_term formater visited_term;
-  let flushed = flush_str_formatter () in
+  (* let visited_term = visit_term smt_term in *)
+  visit_main_term smt_term;
+  (* let formater = Format.str_formatter in
+   * print_term formater visited_term;
+   * let flushed = flush_str_formatter () in *)
   Printf.printf "\nORIGINAL \n";
   print_term Format.std_formatter smt_term;
-  Printf.printf "\nFLATTENED \n%s" flushed;
+  (* Printf.printf "\nFLATTENED \n%s" flushed; *)
   (* Printf.printf "test"; *)
   Printf.printf "\nHASHTABLE";
   Hashtbl.iter

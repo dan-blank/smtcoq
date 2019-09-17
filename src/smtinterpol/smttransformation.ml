@@ -79,3 +79,7 @@ and visit_term = function
     let flattened_subterm = visit_term t in
     let flattened_attributes = List.map visit_attribute al in
     TermExclimationPt (loc, flattened_subterm, (loc2, flattened_attributes))
+
+let visit_main_term t =
+  let main_term = visit_term t in
+  Hashtbl.add flattened_table (Symbol (dummyloc, ".mainproof")) main_term
