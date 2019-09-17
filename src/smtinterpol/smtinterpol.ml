@@ -6,6 +6,7 @@ open SatAtom
 open SmtMisc
 open Format
 open Smttransformation
+open Smtlib2_ast
 open Modified_smtlib2_printing
 
 let import_trace proof =
@@ -13,7 +14,6 @@ let import_trace proof =
   let lexbuf = Lexing.from_channel chan in
   let first_num = ref (Smtlib2_parse.mainterm Smtlib2_lex.token lexbuf) in
   !first_num
-
 
 
 let simple_constant_tests =
@@ -25,9 +25,18 @@ let simple_constant_tests =
   let formater = Format.str_formatter in
   print_term formater visited_term;
   let flushed = flush_str_formatter () in
-  Printf.printf "%s" flushed;
+  Printf.printf "\nORIGINAL \n";
+  print_term Format.std_formatter smt_term;
+  Printf.printf "\nFLATTENED \n%s" flushed;
   (* Printf.printf "test"; *)
-  Hashtbl.iter (fun x y -> printf "\n"; print_symbol Format.std_formatter x; printf " -> "; print_term Format.std_formatter y) flattened_table
+  Printf.printf "\nHASHTABLE";
+  Hashtbl.iter
+    (fun x y ->
+       printf "\n";
+       print_symbol Format.std_formatter x;
+       printf " -> ";
+       print_term Format.std_formatter y)
+    flattened_table
   (* print_clause_proof Format.std_formatter translated_term *)
 (* print_term (Format.std_formatter) smt_term *)
 (*
