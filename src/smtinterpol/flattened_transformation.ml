@@ -37,7 +37,7 @@ let translate_sortedvar = function
     translate_symbol v
 
 let translate_annotation = function
-  | _ -> ()
+  | _ -> ""
 
 
 (* let rec get_first_literal = function
@@ -51,20 +51,51 @@ let translate_annotation = function
  *   | TermExclimationPt (_, _, _) ->  *)
 
 
-let rec translate_annotated_proof_term = function
-  | TermExclimationPt (_, t, a) ->
-    let translated_pt = translate_annotated_proof_term t in 
-    let translated_a = translate_annotation a in
-    CDummy 
-  | TermQualIdTerm (_, i, (_, tl)) ->
-    let translated_pt = translate_proof_term (string_of_qualidentifier i,tl) in
-    CDummy
+let translate_annotated_formula_term term acc_annotation =
+  match term with
+  | t ->
+    let ra = VeritSyntax.ra in
+    let rf = VeritSyntax.rf in
+    VeritSyntax.add_fun "p" (SmtAtom.dummy_indexed_op (Rel_name "p") [||] Tbool);
+    Smtlib2_genConstr.make_root ra rf t
 
-and translate_proof_term = function
+let rec translate_annotated_fproof_term term acc_annotation =
+  match term with
+  | TermExclimationPt (_, t, a) ->
+    let translated_a = translate_annotation a in
+    translate_annotated_fproof_term t (acc_annotation ^ translated_a)
+  | TermQualIdTerm (_, i, (_, tl)) ->
+    translate_fproof_term (string_of_qualidentifier i,tl) acc_annotation
+
+and translate_fproof_term termcontext acc_annotation =
+  match termcontext with
+  | "@asserted", [formula_term] ->
+    print_string "Visiting a @asserted!";
+    let f = translate_annotated_formula_term formula_term "" in
+    Asserted (f, acc_annotation)
+  | _, _ ->
+    print_string " SOMETHING DIFFERENT! ";
+    FDummy
+
+let rec translate_annotated_proof_term term acc_annotation =
+  match term with
+  | TermExclimationPt (_, t, a) ->
+    let translated_a = translate_annotation a in
+    translate_annotated_proof_term t (acc_annotation ^ translated_a)
+  | TermQualIdTerm (_, i, (_, tl)) ->
+    translate_proof_term (string_of_qualidentifier i,tl) acc_annotation
+
+and translate_proof_term termcontext acc_annotation =
+  match termcontext with
   | "@res", cps ->
     print_string "Visiting a @res!";
-    let translated_cps = List.map translate_annotated_proof_term cps in
-    CDummy
+    let [cl ; acl] = List.map (fun x -> translate_annotated_proof_term  x "") cps in
+    Resolution (cl, acl, acc_annotation)
+  | "@clause", [fpterm; fterm] ->
+    print_string "Visiting a @clause!";
+    let fp = translate_annotated_fproof_term fpterm "" in
+    let f = translate_annotated_formula_term fterm "" in
+    Clause (fp, f, acc_annotation)
   | _, _ ->
     print_string " SOMETHING DIFFERENT! ";
     CDummy

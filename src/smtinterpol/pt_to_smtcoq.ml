@@ -4,7 +4,7 @@ open SmtForm
 
 
 let visit_formula = function
-  | DummyFormula -> ()
+  | _ -> ()
 
 let rec visit_equality_proof = function
   | Reflexivity (f, _) -> visit_formula f
@@ -47,4 +47,4 @@ let rec visit_clause_proof = function
     visit_formula_proof fp;
     visit_formula f
   | Lemma (l, _) -> visit_lemma l
-  | CDummy -> ()
+  (* | CDummy -> () *)

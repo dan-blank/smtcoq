@@ -1,7 +1,7 @@
 open Smtlib2_ast
 open SmtAtom
 
-type formula = DummyFormula
+type formula = SmtAtom.Form.t
 
 type tautology_rule = IteRed | ExcludedMiddle1
 
