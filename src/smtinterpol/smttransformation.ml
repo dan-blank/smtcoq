@@ -3,10 +3,21 @@ open Format
 open Modified_smtlib2_printing
 
 (* This table holds smt terms that were either introduced by a let-term or a contained in an attribute. *)
-let flattened_table : (symbol, term) Hashtbl.t = Hashtbl.create 17 
+let flattened_table : (string, term) Hashtbl.t = Hashtbl.create 17 
 (* A counter to ensure that terms in flattened_table introduced by attributes have a unique name. *)
 let attribute_counter = ref 0
 
+let string_of_symbol = function
+  | Symbol (_, s) -> s
+let get_corresponding_term_default symbol default =
+  let result = Hashtbl.find_all flattened_table (string_of_symbol symbol) in
+  match result with
+   | [t] ->
+     print_string Format.std_formatter "\n HIT!";
+     t
+   | [] ->
+     print_string Format.std_formatter "\n MISS!";
+     default
 
 let fresh_attribute_symbol_string () =
   let attribute_counter_string = string_of_int !attribute_counter in
@@ -19,7 +30,14 @@ let fresh_attribute_symbol () = Symbol (dummyloc, fresh_attribute_symbol_string 
 
 let fresh_attribute_sexpr () = SexprSymbol (dummyloc, fresh_attribute_symbol ())
 
-
+let string_of_identifier = function
+  | IdSymbol (_, (Symbol (_, s))) -> s
+let symbol_of_identifier = function
+  | IdSymbol (_, s) -> s
+let string_of_qualidentifier = function
+  | QualIdentifierId (_, i) -> string_of_identifier i
+let symbol_of_qualidentifier = function
+  | QualIdentifierId (_, i) -> symbol_of_identifier i
 let sexpr_to_string sexpr =
   let strformater = Format.str_formatter in
   print_sexpr strformater sexpr;
@@ -35,7 +53,7 @@ let parse_sexpr_as_term = function
 let transform_sexpr_to_term_and_return_symbol sexpr =
   let transformed_sexpr = parse_sexpr_as_term sexpr in
   let SexprSymbol(l, s) = fresh_attribute_sexpr () in
-  Hashtbl.add flattened_table s transformed_sexpr;
+  Hashtbl.add flattened_table (string_of_symbol s) transformed_sexpr;
   SexprSymbol(l,s)
 
 let transform_sexpr_list = function
@@ -63,14 +81,19 @@ let visit_attribute = function
 
 
 let rec visit_varbinding = function
-  | VarBindingSymTerm (_, s, t) -> Hashtbl.add flattened_table s t
+  | VarBindingSymTerm (_, s, t) ->
+    (* let visit_term t 
+     * let flattened_term = get_corresponding_term_default s t in *)
+    Hashtbl.add flattened_table (string_of_symbol s) (visit_term t)
 
 and visit_term = function
   | TermSpecConst (_, c) as wt -> wt
   | TermQualIdTerm (l1, i, (l2, tl)) as wt ->
     let flattened_terms = List.map visit_term tl in
     TermQualIdTerm (l1, i, (l2, flattened_terms))
-  | TermQualIdentifier (_, i) as wt -> wt
+  | TermQualIdentifier (l, i) when String.get (string_of_qualidentifier i) 0 == '.'->
+    get_corresponding_term_default (symbol_of_qualidentifier i) (TermQualIdentifier (l,i))
+  | TermQualIdentifier (_, _) as wt -> wt
   | TermLetTerm (_, (_, vb), t) ->
     List.iter (visit_varbinding) vb;
     visit_term t
@@ -82,4 +105,4 @@ and visit_term = function
 
 let visit_main_term t =
   let main_term = visit_term t in
-  Hashtbl.add flattened_table (Symbol (dummyloc, ".mainproof")) main_term
+  Hashtbl.add flattened_table ".mainproof" main_term

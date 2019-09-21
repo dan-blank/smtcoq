@@ -8,6 +8,8 @@ open Format
 open Smttransformation
 open Smtlib2_ast
 open Modified_smtlib2_printing
+open Flattened_transformation
+open Pt_to_smtcoq
 
 let import_trace proof =
   let chan = open_in proof in
@@ -19,27 +21,23 @@ let import_trace proof =
 let simple_constant_tests =
   (* let smt_term = import_trace "../examples/rl_full_trivial.smt2" in *)
   let smt_term = import_trace "smtinterpol/rl_full_complex.scm" in
-  (* let smt_term = import_trace "../examples/rl_full_trivial.smt2" in *)
-  (* let translated_term = smt_to_internal_clause_proof smt_term in *)
-  (* let visited_term = visit_term smt_term in *)
-  visit_main_term smt_term;
-  (* let formater = Format.str_formatter in
-   * print_term formater visited_term;
-   * let flushed = flush_str_formatter () in *)
+  (* let smt_term = import_trace "minimal_proof_p_not_p_log.scm" in *)
   Printf.printf "\nORIGINAL \n";
   print_term Format.std_formatter smt_term;
-  (* Printf.printf "\nFLATTENED \n%s" flushed; *)
-  (* Printf.printf "test"; *)
-  Printf.printf "\nHASHTABLE";
+  visit_main_term smt_term;
+  Printf.printf "\nFLATTENED\n";
   Hashtbl.iter
     (fun x y ->
        printf "\n";
-       print_symbol Format.std_formatter x;
+       print_string Format.std_formatter x;
        printf " -> ";
        print_term Format.std_formatter y)
-    flattened_table
-  (* print_clause_proof Format.std_formatter translated_term *)
-(* print_term (Format.std_formatter) smt_term *)
+    flattened_table;
+  Printf.printf "\nIR\n";
+  let proottree = translate_annotated_proof_term (Hashtbl.find flattened_table ".mainproof" ) in
+  visit_clause_proof proottree
+
+
 (*
 Take an SMT2-formula and an SMTInterpol-proof and check whether the proof proves the formula unsatisfiable.
 This function is called when Coq calls the vernacular command 'Smtinterpol.checker'.

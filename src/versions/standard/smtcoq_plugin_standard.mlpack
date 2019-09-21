@@ -57,7 +57,8 @@ Lfsc
 Modified_smtlib2_printing
 Smttransformation
 Prooftree_ast
-
+Flattened_transformation
+Pt_to_smtcoq
 Smtinterpol
 
 
