@@ -9,6 +9,7 @@
 (*                                                                        *)
 (**************************************************************************)
 
+val mkRoot : SmtAtom.Form.t SmtCertif.clause
 
 val notUsed : int
 val clear : unit -> unit

@@ -53,7 +53,7 @@ let mkRootGen ov =
    value = ov
  }
 
-(* let mkRoot = mkRootGen None *)
+let mkRoot  = mkRootGen None
 let mkRootV v = mkRootGen (Some v)
 
 let isRoot k = k == Root
