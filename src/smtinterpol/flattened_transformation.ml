@@ -56,6 +56,7 @@ let translate_annotated_formula_term term acc_annotation =
   | t ->
     let ra = VeritSyntax.ra in
     let rf = VeritSyntax.rf in
+    (*TODO Delete*)
     VeritSyntax.add_fun "p" (SmtAtom.dummy_indexed_op (Rel_name "p") [||] Tbool);
     Smtlib2_genConstr.make_root ra rf t
 
@@ -75,7 +76,8 @@ and translate_fproof_term termcontext acc_annotation =
     Asserted (f, acc_annotation)
   | _, _ ->
     print_string " SOMETHING DIFFERENT! ";
-    FDummy
+    raise (FlattenTransformationExpection "Formulaproof not supported yet!")
+    (* FDummy *)
 
 let rec translate_annotated_proof_term term acc_annotation =
   match term with
@@ -98,7 +100,8 @@ and translate_proof_term termcontext acc_annotation =
     Clause (fp, f, acc_annotation)
   | _, _ ->
     print_string " SOMETHING DIFFERENT! ";
-    CDummy
+    raise (FlattenTransformationExpection "Clauseproof not supported yet!")
+    (* CDummy *)
 
 let rec translate_varbinding = function
   | VarBindingSymTerm (_, s, t) ->
