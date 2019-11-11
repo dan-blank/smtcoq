@@ -133,7 +133,7 @@ smtinterpol/smtinterpol.ml
 smtinterpol/prooftree_ast.ml
 smtinterpol/flattened_transformation.ml
 smtinterpol/pt_to_smtcoq.ml
-smtinterpol/smttransformation.ml
+smtinterpol/tabulation.ml
 smtinterpol/smtinterpolParser.ml
 smtinterpol/smtinterpolParser.mli
 smtinterpol/smtinterpolLexer.ml

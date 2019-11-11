@@ -2,15 +2,26 @@ open Smtlib2_ast
 open Format
 open Modified_smtlib2_printing
 
-(* This table holds smt terms that were either introduced by a let-term or a contained in an attribute. *)
-let flattened_table : (string, term) Hashtbl.t = Hashtbl.create 17 
-(* A counter to ensure that terms in flattened_table introduced by attributes have a unique name. *)
+(* This table contains terms that result from tabulating the initial SMTInterpol proof. It contains no let terms and no SexprInParens.   *)
+let term_table : (string, term) Hashtbl.t = Hashtbl.create 17 
+
+(* This table contains lists of terms that result from tabulating the initial SMTInterpol proof. The only way to create a lists of terms is to use a SexprInParens as part of an AttributeValSexpr.   *)
+let term_list_table : (string, term list) Hashtbl.t = Hashtbl.create 17 
+
+(* A counter to ensure that terms in term_table introduced by attributes have a unique name. *)
 let attribute_counter = ref 0
+
+
+(******************************************************************************)
+(* Given a verit trace build the corresponding certif and theorem             *)
+(******************************************************************************)
+
+
 
 let string_of_symbol = function
   | Symbol (_, s) -> s
 let get_corresponding_term_default symbol default =
-  let result = Hashtbl.find_all flattened_table (string_of_symbol symbol) in
+  let result = Hashtbl.find_all term_table (string_of_symbol symbol) in
   match result with
    | [t] ->
      print_string Format.std_formatter "\n HIT!";
@@ -53,7 +64,7 @@ let parse_sexpr_as_term = function
 let transform_sexpr_to_term_and_return_symbol sexpr =
   let transformed_sexpr = parse_sexpr_as_term sexpr in
   let SexprSymbol(l, s) = fresh_attribute_sexpr () in
-  Hashtbl.add flattened_table (string_of_symbol s) transformed_sexpr;
+  Hashtbl.add term_table (string_of_symbol s) transformed_sexpr;
   SexprSymbol(l,s)
 
 let transform_sexpr_list = function
@@ -67,42 +78,44 @@ let flatten_attribute_keyword_value_sexpr = function
     AttributeValSexpr (l1, (l2, at :: a :: flattened_sexpr_list))
 
 
-let visit_attribute_value annotation_name = function
+let tabulate_attribute_value annotation_name = function
   | AttributeValSpecConst (_, _) as wav -> wav
   | AttributeValSymbol (_, _) as wav -> wav
   | AttributeValSexpr (l1, (l2, sl)) as avs ->
     flatten_attribute_keyword_value_sexpr (annotation_name, avs)
 
-let visit_attribute = function
+let tabulate_attribute = function
   | AttributeKeyword (_, _) as wa -> wa
   | AttributeKeywordValue (l1, an, av) ->
-    let flattened_attribute_value = visit_attribute_value an av in
+    let flattened_attribute_value = tabulate_attribute_value an av in
     AttributeKeywordValue (l1, an, flattened_attribute_value)
 
 
-let rec visit_varbinding = function
+let rec tabulate_varbinding = function
   | VarBindingSymTerm (_, s, t) ->
-    (* let visit_term t 
+    (* let tabulate_term t 
      * let flattened_term = get_corresponding_term_default s t in *)
-    Hashtbl.add flattened_table (string_of_symbol s) (visit_term t)
-
-and visit_term = function
+    Hashtbl.add term_table (string_of_symbol s) (tabulate_term t)
+(*TODO Apply to subterms too!*)
+and tabulate_term = function
   | TermSpecConst (_, c) as wt -> wt
   | TermQualIdTerm (l1, i, (l2, tl)) as wt ->
-    let flattened_terms = List.map visit_term tl in
+    let flattened_terms = List.map tabulate_term tl in
     TermQualIdTerm (l1, i, (l2, flattened_terms))
   | TermQualIdentifier (l, i) when String.get (string_of_qualidentifier i) 0 == '.'->
     get_corresponding_term_default (symbol_of_qualidentifier i) (TermQualIdentifier (l,i))
   | TermQualIdentifier (_, _) as wt -> wt
   | TermLetTerm (_, (_, vb), t) ->
-    List.iter (visit_varbinding) vb;
-    visit_term t
+    List.iter (tabulate_varbinding) vb;
+    tabulate_term t
   | TermExistsTerm (_, (_, sv), t) as wt -> wt
   | TermExclimationPt (loc, t, (loc2, al)) as wt ->
-    let flattened_subterm = visit_term t in
-    let flattened_attributes = List.map visit_attribute al in
+    let flattened_subterm = tabulate_term t in
+    let flattened_attributes = List.map tabulate_attribute al in
     TermExclimationPt (loc, flattened_subterm, (loc2, flattened_attributes))
 
-let visit_main_term t =
-  let main_term = visit_term t in
-  Hashtbl.add flattened_table ".mainproof" main_term
+
+(* Given an proof of type term, create two tables containg the preprocessed terms and term lists. *)
+let tabulate_proof proof =
+  let main_term = tabulate_term proof in
+  Hashtbl.add term_table ".mainproof" main_term
