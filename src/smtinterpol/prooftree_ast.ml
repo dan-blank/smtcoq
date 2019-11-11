@@ -10,25 +10,25 @@ type rewrite_rule = AndToOr | EqFalse
 type split_rule = XXX
 
 type equality_proof =
-    | Reflexivity          of formula * string
-    | Transitivity         of equality_proof * equality_proof * string
-    | Congruence           of equality_proof * equality_proof * string
-    | Rewrite              of formula * rewrite_rule * string
+    | Reflexivity          of formula
+    | Transitivity         of equality_proof * equality_proof
+    | Congruence           of equality_proof * equality_proof
+    | Rewrite              of formula * rewrite_rule
     | EDummy        
     
 type formula_proof =
-  | Tautology          of formula  * tautology_rule * string
-  | Asserted           of formula  * string
-  | Equality           of formula_proof * equality_proof * string
-  | Split              of formula_proof * formula  * split_rule * string
+  | Tautology          of formula  * tautology_rule
+  | Asserted           of formula 
+  | Equality           of formula_proof * equality_proof
+  | Split              of formula_proof * formula  * split_rule
   | FDummy         
 
 type lemma =
-  | L_CC_Transitivity of formula * formula * formula list * string
-  | L_CC_Congruence of formula * formula * formula * formula * string
+  | L_CC_Transitivity of formula * formula * formula list
+  | L_CC_Congruence of formula * formula * formula * formula
 
 type clause_proof =
-  | Resolution        of clause_proof * clause_proof * string
-  | Clause            of formula_proof * formula * string
-  | Lemma             of lemma  * string
+  | Resolution        of clause_proof * clause_proof
+  | Clause            of formula_proof * formula
+  | Lemma             of lemma 
   | CDummy        

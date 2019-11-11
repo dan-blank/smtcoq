@@ -51,53 +51,49 @@ let translate_annotation = function
  *   | TermExclimationPt (_, _, _) ->  *)
 
 
-let translate_annotated_formula_term term acc_annotation =
+let translate_annotated_formula_term term =
   match term with
   | t ->
     let ra = VeritSyntax.ra in
     let rf = VeritSyntax.rf in
-    (*TODO Delete*)
-    VeritSyntax.add_fun "p" (SmtAtom.dummy_indexed_op (Rel_name "p") [||] Tbool);
     Smtlib2_genConstr.make_root ra rf t
 
-let rec translate_annotated_fproof_term term acc_annotation =
+let rec translate_annotated_fproof_term term =
   match term with
   | TermExclimationPt (_, t, a) ->
-    let translated_a = translate_annotation a in
-    translate_annotated_fproof_term t (acc_annotation ^ translated_a)
+    translate_annotated_fproof_term t 
   | TermQualIdTerm (_, i, (_, tl)) ->
-    translate_fproof_term (string_of_qualidentifier i,tl) acc_annotation
+    translate_fproof_term (string_of_qualidentifier i,tl)
 
-and translate_fproof_term termcontext acc_annotation =
+and translate_fproof_term termcontext =
   match termcontext with
   | "@asserted", [formula_term] ->
-    print_string "Visiting a @asserted!";
-    let f = translate_annotated_formula_term formula_term "" in
-    Asserted (f, acc_annotation)
+    (* print_string "Visiting a @asserted!"; *)
+    let f = translate_annotated_formula_term formula_term in
+    Asserted f
   | _, _ ->
-    print_string " SOMETHING DIFFERENT! ";
+    (* print_string " SOMETHING DIFFERENT! "; *)
     raise (FlattenTransformationExpection "Formulaproof not supported yet!")
     (* FDummy *)
 
-let rec translate_annotated_proof_term term acc_annotation =
+let rec translate_annotated_proof_term term =
   match term with
   | TermExclimationPt (_, t, a) ->
-    let translated_a = translate_annotation a in
-    translate_annotated_proof_term t (acc_annotation ^ translated_a)
+    translate_annotated_proof_term t 
   | TermQualIdTerm (_, i, (_, tl)) ->
-    translate_proof_term (string_of_qualidentifier i,tl) acc_annotation
+    translate_proof_term (string_of_qualidentifier i,tl) 
 
-and translate_proof_term termcontext acc_annotation =
+and translate_proof_term termcontext =
   match termcontext with
   | "@res", cps ->
-    print_string "Visiting a @res!";
-    let [cl ; acl] = List.map (fun x -> translate_annotated_proof_term  x "") cps in
-    Resolution (cl, acl, acc_annotation)
+    (* print_string "Visiting a @res!"; *)
+    let [cl ; acl] = List.map translate_annotated_proof_term cps in
+    Resolution (cl, acl)
   | "@clause", [fpterm; fterm] ->
-    print_string "Visiting a @clause!";
-    let fp = translate_annotated_fproof_term fpterm "" in
-    let f = translate_annotated_formula_term fterm "" in
-    Clause (fp, f, acc_annotation)
+    (* print_string "Visiting a @clause!"; *)
+    let fp = translate_annotated_fproof_term fpterm in
+    let f = translate_annotated_formula_term fterm in
+    Clause (fp, f)
   | _, _ ->
     print_string " SOMETHING DIFFERENT! ";
     raise (FlattenTransformationExpection "Clauseproof not supported yet!")

@@ -41,7 +41,7 @@ let generate_certificate fsmt fproof =
        printf " -> ";
        print_term Format.std_formatter y)
     term_table;
-  let prooftree = translate_annotated_proof_term (Hashtbl.find term_table ".mainproof" ) "" in
+  let prooftree = translate_annotated_proof_term (Hashtbl.find term_table ".mainproof" ) in
   let confl = visit_clause_proof prooftree in
   SmtTrace.select confl;
   occur confl;
