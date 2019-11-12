@@ -50,49 +50,100 @@ let translate_annotation = function
 (* let translate_lemma = function
  *   | TermExclimationPt (_, _, _) ->  *)
 
+let string_of_single_atttribute = function
+  | (_, [AttributeKeyword (_, s)]) -> s
 
-let translate_annotated_formula_term term =
+let translate_split_annotation = function
+  | ":xor-1" -> Split_xor_1
+
+let translate_rewrite_annotation = function
+  | ":eqToXor" -> Rewrite_eqToXor
+
+let translate_annotated_formula_term term annotation =
   match term with
   | t ->
     let ra = VeritSyntax.ra in
     let rf = VeritSyntax.rf in
     Smtlib2_genConstr.make_root ra rf t
 
-let rec translate_annotated_fproof_term term =
+let get_execption pv =
+  print_string "\n FT: get_execption";
+  match pv with
+  | Some v -> v
+  | None -> raise (FlattenTransformationExpection "term_to_proofrules: Invalid Option!")
+
+let rec translate_annotated_eproof_term term (closest_annotation: (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
   match term with
   | TermExclimationPt (_, t, a) ->
-    translate_annotated_fproof_term t 
+    print_string "\n FT: translate_annotated_eproof_term => TermExplimationPt";
+    translate_annotated_eproof_term t (Some a)
   | TermQualIdTerm (_, i, (_, tl)) ->
-    translate_fproof_term (string_of_qualidentifier i,tl)
+    print_string "\n FT: translate_annotated_eproof_term => TermQualIdTerm";
+    translate_eproof_term (string_of_qualidentifier i,tl) closest_annotation
 
-and translate_fproof_term termcontext =
+and translate_eproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
+  match termcontext with
+  | "@rewrite", [TermExclimationPt (_, formula_term, rewrite_annotation)] ->
+    print_string "\n FT: translate_eproof_term => @rewrite";
+    (* Format.fprintf Format.std_formatter "\n ACHTUNG ACHTUNG HIER IST DIE ANNOTATION!! \n";
+     * print_string (string_of_single_atttribute (get_execption annotation)); *)
+    (* print_term Format.std_formatter annotation; *)
+    let f = translate_annotated_formula_term formula_term None in
+    print_string "\n FT: AFTER f";
+    let a = translate_rewrite_annotation (string_of_single_atttribute rewrite_annotation) in
+    print_string "\n FT: AFTER a";
+    Rewrite (f, a)
+let rec translate_annotated_fproof_term term (closest_annotation: (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
+  match term with
+  | TermExclimationPt (_, t, a) ->
+    print_string "\n FT: translate_annotated_fproof_term => TermExplimationPt";
+    translate_annotated_fproof_term t (Some a)
+  | TermQualIdTerm (_, i, (_, tl)) ->
+    print_string "\n FT: translate_annotated_fproof_term => TermQualIdTerm";
+    translate_fproof_term (string_of_qualidentifier i,tl) closest_annotation
+
+and translate_fproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
   match termcontext with
   | "@asserted", [formula_term] ->
+    print_string "\n FT: translate_fproof_term => @asserted";
     (* print_string "Visiting a @asserted!"; *)
-    let f = translate_annotated_formula_term formula_term in
+    let f = translate_annotated_formula_term formula_term None in
     Asserted f
+  | "@split", [TermExclimationPt (_, formula_proof_term, split_annotation); formula_term] ->
+    print_string "\n FT: translate_fproof_term => @split";
+    let fp = translate_annotated_fproof_term formula_proof_term annotation in
+    let f = translate_annotated_formula_term formula_term None in
+    let a = translate_split_annotation (string_of_single_atttribute split_annotation) in
+    Split (fp, f, a)
+  | "@eq", [formula_proof_term; equality_proof_term] ->
+    print_string "\n FT: translate_fproof_term => @eq";
+    let fp = translate_annotated_fproof_term formula_proof_term annotation in
+    let ep = translate_annotated_eproof_term equality_proof_term annotation in
+    Equality (fp, ep)
   | _, _ ->
     (* print_string " SOMETHING DIFFERENT! "; *)
     raise (FlattenTransformationExpection "Formulaproof not supported yet!")
     (* FDummy *)
 
-let rec translate_annotated_proof_term term =
+let rec translate_annotated_clause_proof_term (term : Smtlib2_ast.term) (closest_annotation : (Smtlib2_ast.loc * (Smtlib2_ast.attribute list)) option) =
   match term with
   | TermExclimationPt (_, t, a) ->
-    translate_annotated_proof_term t 
+    print_string "\n FT: translate_annotated_clause_proof_term => TermExplimationPt";
+    translate_annotated_clause_proof_term t (Some a)
   | TermQualIdTerm (_, i, (_, tl)) ->
-    translate_proof_term (string_of_qualidentifier i,tl) 
+    print_string "\n FT: translate_annotated_clause_proof_term => TermQualIdTerm";
+    translate_clause_proof_term (string_of_qualidentifier i,tl) closest_annotation 
 
-and translate_proof_term termcontext =
+and translate_clause_proof_term termcontext annotation =
   match termcontext with
-  | "@res", cps ->
+  | "@res", clause_proof_terms ->
     (* print_string "Visiting a @res!"; *)
-    let [cl ; acl] = List.map translate_annotated_proof_term cps in
-    Resolution (cl, acl)
+    let head_clause :: cls = List.map (fun clp -> translate_annotated_clause_proof_term clp None) clause_proof_terms in
+    List.fold_left (fun acc cl -> Resolution (acc, cl)) head_clause cls
   | "@clause", [fpterm; fterm] ->
     (* print_string "Visiting a @clause!"; *)
-    let fp = translate_annotated_fproof_term fpterm in
-    let f = translate_annotated_formula_term fterm in
+    let fp = translate_annotated_fproof_term fpterm annotation in
+    let f = translate_annotated_formula_term fterm annotation in
     Clause (fp, f)
   | _, _ ->
     print_string " SOMETHING DIFFERENT! ";

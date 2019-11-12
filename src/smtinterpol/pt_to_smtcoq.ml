@@ -3,6 +3,8 @@ open SmtAtom
 open SmtForm
 open SmtTrace
 
+exception ProofrulesToSMTCoqExpection of string
+
 let visit_formula = function
   | _ -> SmtTrace.mkRoot
 
@@ -16,7 +18,9 @@ let rec visit_equality_proof = function
     (* visit_equality_proof ep1;
      * visit_equality_proof ep2 *)
     mkRoot
-  | Rewrite (f, _) -> visit_formula f
+  | Rewrite (f, _) ->
+    raise (ProofrulesToSMTCoqExpection "Rewrite not supported yet!");
+    visit_formula f
   | EDummy -> mkRoot
 
 let rec visit_formula_proof = function
@@ -25,10 +29,12 @@ let rec visit_formula_proof = function
   | Equality (fp, ep) ->
     (* visit_formula_proof fp;
      * visit_equality_proof ep *)
+    raise (ProofrulesToSMTCoqExpection "Equality not supported yet!");
     mkRoot
   | Split (fp, f, _) ->
     (* visit_formula_proof fp;
      * visit_formula f *)
+    raise (ProofrulesToSMTCoqExpection "Split not supported yet!");
     mkRoot
   | FDummy -> mkRoot 
 

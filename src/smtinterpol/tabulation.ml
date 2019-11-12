@@ -13,10 +13,8 @@ let attribute_counter = ref 0
 
 
 (******************************************************************************)
-(* Given a verit trace build the corresponding certif and theorem             *)
+(* Helper functions.                                                           *)
 (******************************************************************************)
-
-
 
 let string_of_symbol = function
   | Symbol (_, s) -> s
@@ -77,6 +75,9 @@ let flatten_attribute_keyword_value_sexpr = function
     let flattened_sexpr_list = transform_sexpr_list sl in
     AttributeValSexpr (l1, (l2, at :: a :: flattened_sexpr_list))
 
+(******************************************************************************)
+(* Tabulate functions that visit values defined in SmtLib2_ast.                *)
+(******************************************************************************)
 
 let tabulate_attribute_value annotation_name = function
   | AttributeValSpecConst (_, _) as wav -> wav

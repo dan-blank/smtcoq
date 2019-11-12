@@ -5,9 +5,12 @@ type formula = SmtAtom.Form.t
 
 type tautology_rule = IteRed | ExcludedMiddle1
 
-type rewrite_rule = AndToOr | EqFalse
+type rewrite_rule =
+  | AndToOr
+  | EqFalse
+  | Rewrite_eqToXor
 
-type split_rule = XXX
+type split_rule = Split_xor_1
 
 type equality_proof =
     | Reflexivity          of formula

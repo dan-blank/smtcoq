@@ -41,8 +41,10 @@ let generate_certificate fsmt fproof =
        printf " -> ";
        print_term Format.std_formatter y)
     term_table;
-  let prooftree = translate_annotated_proof_term (Hashtbl.find term_table ".mainproof" ) in
+  let prooftree = translate_annotated_clause_proof_term (Hashtbl.find term_table ".mainproof" ) None in
+  Printf.printf "\nConverted To proofrules\n";
   let confl = visit_clause_proof prooftree in
+  Printf.printf "\nConverted To SMTCoq proof\n";
   SmtTrace.select confl;
   occur confl;
   let max_id = alloc confl in
