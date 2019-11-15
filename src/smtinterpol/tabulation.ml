@@ -57,6 +57,8 @@ let parse_sexpr_as_term = function
     let strformater = Format.str_formatter in
     print_sexpr strformater s;
     let sexpr_string = flush_str_formatter () in
+    (* TODO Recursiv behandeln, könnte let terms beinhalten
+    variable einführen etc. *)
     Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string sexpr_string)
 
 let transform_sexpr_to_term_and_return_symbol sexpr =

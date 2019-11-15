@@ -2,8 +2,35 @@ open Prooftree_ast
 open SmtAtom
 open SmtForm
 open SmtTrace
+open Printexc
 
 exception ProofrulesToSMTCoqExpection of string
+
+let form_op_to_string = function
+  | Ftrue -> "Ftrue"
+  | Ffalse -> "Ffalse"
+  | Fand -> "Fand"
+  | For -> "For"
+  | Fxor -> "Fxor"
+  | Fimp -> "Fimp"
+  | Fiff -> "Fiff"
+  | Fite -> "Fite"
+  | _ -> "Not supported yet"
+
+(* let pp_form_op op = Printf.printf (form_op_to_string op) *)
+
+let rec pp_form = function
+  | Fatom (a) ->
+    Printf.printf "(";
+    Printf.printf "Fatom ";
+    Atom.to_smt Format.std_formatter a;
+    Printf.printf ")"
+  | Fapp (fop, farray) ->
+    Printf.printf "(";
+    Printf.printf "Fapp ";
+    Printf.printf "%s" (form_op_to_string fop);
+    Array.iter (fun f -> pp_form (Form.pform f)) farray;
+    Printf.printf ")"
 
 let visit_formula = function
   | _ -> SmtTrace.mkRoot
@@ -18,9 +45,11 @@ let rec visit_equality_proof = function
     (* visit_equality_proof ep1;
      * visit_equality_proof ep2 *)
     mkRoot
-  | Rewrite (f, _) ->
-    raise (ProofrulesToSMTCoqExpection "Rewrite not supported yet!");
-    visit_formula f
+  | Rewrite (formula, rule) ->
+    Printf.printf ("\n hey hey ------------------ \n");
+    pp_form (Form.pform formula);
+    (* raise (ProofrulesToSMTCoqExpection "Rewrite not supported yet!"); *)
+    visit_formula formula
   | EDummy -> mkRoot
 
 let rec visit_formula_proof = function
@@ -29,12 +58,14 @@ let rec visit_formula_proof = function
   | Equality (fp, ep) ->
     (* visit_formula_proof fp;
      * visit_equality_proof ep *)
-    raise (ProofrulesToSMTCoqExpection "Equality not supported yet!");
+    (* raise (ProofrulesToSMTCoqExpection "Equality not supported yet!"); *)
     mkRoot
-  | Split (fp, f, _) ->
+  | Split (fp, f, rule) ->
     (* visit_formula_proof fp;
      * visit_formula f *)
-    raise (ProofrulesToSMTCoqExpection "Split not supported yet!");
+    Printf.printf ("\n hey hey ------------------ \n");
+    pp_form (Form.pform f);
+    (* raise (ProofrulesToSMTCoqExpection "Split not supported yet!"); *)
     mkRoot
   | FDummy -> mkRoot 
 
