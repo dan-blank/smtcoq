@@ -43,11 +43,15 @@ let generate_certificate fsmt fproof =
     term_table;
   let prooftree = translate_annotated_clause_proof_term (Hashtbl.find term_table ".mainproof" ) None in
   Printf.printf "\nConverted To proofrules\n";
-  let confl = visit_clause_proof prooftree in
+  let raw_confl = visit_clause_proof prooftree in
+  Printf.printf "\nsmtinterpol: before calling add_clauses_after_roots";
+  let confl = add_clauses_after_roots () in
   Printf.printf "\nConverted To SMTCoq proof\n";
   SmtTrace.select confl;
   occur confl;
   let max_id = alloc confl in
+  Printf.printf "\nPrepared SMTCoq certificate\n";
+  print_certif Form.to_smt Atom.to_smt confl ".certoutput";
   (rt, ro, ra, rf, roots, max_id, confl)
 
 let clear_all () =

@@ -83,12 +83,12 @@ let rec translate_annotated_eproof_term term (closest_annotation: (Smtlib2_ast.l
 
 and translate_eproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
   match termcontext with
-  | "@rewrite", [TermExclimationPt (_, formula_term, rewrite_annotation)] ->
+  | "@rewrite", [TermExclimationPt (_, TermQualIdTerm (_, _, (_, _ :: goal :: _)), rewrite_annotation)] ->
     print_string "\n FT: translate_eproof_term => @rewrite";
     (* Format.fprintf Format.std_formatter "\n ACHTUNG ACHTUNG HIER IST DIE ANNOTATION!! \n";
      * print_string (string_of_single_atttribute (get_execption annotation)); *)
     (* print_term Format.std_formatter annotation; *)
-    let f = translate_annotated_formula_term formula_term None in
+    let f = translate_annotated_formula_term goal None in
     print_string "\n FT: AFTER f";
     let a = translate_rewrite_annotation (string_of_single_atttribute rewrite_annotation) in
     print_string "\n FT: AFTER a";
