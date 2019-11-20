@@ -10,7 +10,9 @@ type rewrite_rule =
   | EqFalse
   | Rewrite_eqToXor
 
-type split_rule = Split_xor_1
+type split_rule =
+  | Split_xor_1
+  | Split_xor_2
 
 type equality_proof =
     | Reflexivity          of formula

@@ -7,21 +7,83 @@ open SmtCertif
 
 exception ProofrulesToSMTCoqExpection of string
 
-let last_root_clause = ref None
-let non_root_clauses = ref ([] : SmtAtom.Form.t SmtCertif.clause list)
+let isSome option =
+  match option with
+  | None -> false
+  | _ -> true
 
-let store_root_clause cl =
-  print_string "\n pt_to_smtcoq: store_root_clauses: BEGIN";
-  (match !last_root_clause with
-  | Some lcl -> link lcl cl
-  | None -> ());
-  last_root_clause := Some cl;
-  cl
+let remove_clause (c : 'a) : unit =
+  let lco = c.prev in
+  let rco = c.next in
+  (match rco with
+   | Some (rc) ->
+    c.next <- None;
+    rc.prev <- None
+   | _ -> assert false);
+  (match lco with
+   | Some (lc) ->
+     c.prev <- None;
+     lc.next <- None
+   | _ -> assert false);
+  (if isSome lco && isSome rco then
+     let Some lc = lco in
+     let Some rc = rco in
+     link lc rc)
+  
+let move_before_clause move_clause until_clause =
+  print_string "pt_to_smtcoq: move_before_clause BEGIN";
+  remove_clause move_clause;
+  let prev_until_clause_o = until_clause.prev in
+  (if isSome prev_until_clause_o then
+     let Some prev_until_clause = prev_until_clause_o in
+     link prev_until_clause move_clause);
+  link move_clause until_clause
 
-let store_non_root_clause cl =
-  print_string "\n pt_to_smtcoq: store_non_root_clause: BEGIN";
-  non_root_clauses := cl :: !non_root_clauses;
-  cl
+let move_roots_to_beginning c =
+
+  let encountered = ref false in
+  let roots = ref [] in
+  let first_non_root = ref c in
+  (* let scan_clause non_root_was_encountered roots_after_non_root first_non_root *)
+  let rec scan_clause cl =
+    print_string "\n+#+# scan is called!";
+    (match cl.kind with
+     | Root -> if !encountered then roots := cl :: !roots else encountered := true
+     | _ -> if not !encountered then first_non_root := cl);
+    (match cl.next with
+     | None ->
+       print_string "None in scan";
+       ()
+     | Some ncl -> scan_clause ncl) in
+  scan_clause c;
+  print_string ("pt_to_smtcoq: move_roots_to_beginning " ^ (string_of_int (List.length !roots))) ;
+  List.iter (fun root_to_move -> move_before_clause root_to_move !first_non_root) !roots
+
+let rec get_first c =
+  match c.prev with
+  | Some p -> get_first p
+  | None -> c
+
+let rec get_last c =
+  match c.next with
+  | Some n -> get_last n
+  | None -> c
+
+let increment_root c new_pos =
+  print_string ("\n pt_to_smtcoq increment_root id: " ^ (string_of_int c.id) ^ " new_pos: " ^ (string_of_int new_pos));
+  match c.kind with
+   | Root ->
+     c.pos <- Some new_pos;
+     print_string ("\n pt_to_smtcoq Middle Root! " ^ (string_of_int new_pos))
+   | _ -> ()
+
+let rec reposition_roots c pos =
+  let new_pos = pos + 1 in
+  increment_root c new_pos;
+  match c.next with
+  | Some n ->
+    reposition_roots n new_pos
+  | None -> ()
 
 let form_op_to_string = function
   | Ftrue -> "Ftrue"
@@ -67,8 +129,7 @@ let rec visit_equality_proof = function
     Printf.printf ("\n hey ho ------------------ \n");
     (* Atom.print_atoms VeritSyntax.ra ".atomsoutput"; *)
     pp_form (Form.pform formula);
-    (* mkOther (BuildDef formula) None *)
-    store_root_clause (mkRootV [formula])
+    mkOther (BuildDef formula) None
       (* mkRoot *)
   (* | EDummy -> mkRoot *)
 
@@ -77,12 +138,11 @@ let rec visit_formula_proof = function
   | Asserted (f) ->
     Printf.printf ("\n hey Asserted ------------------ \n");
     pp_form (Form.pform f);
-    store_root_clause  (mkRootV [f])
+    mkRootV [f]
   | Equality (fp, ep) ->
     let fproof_clause = visit_formula_proof fp in
     let eproof_clause = visit_equality_proof ep in
-    (* link fproof_clause eproof_clause;
-     * add_scertifs [(fproof_clause.kind, fproof_clause.value, fproof_clause)] eproof_clause *)
+    link fproof_clause eproof_clause;
     eproof_clause
   | Split (fp, _, rule) ->
     Printf.printf ("\n hey hey ------------------ \n");
@@ -90,9 +150,8 @@ let rec visit_formula_proof = function
     (* Visit formula proof *)
     let not_xor1_clause = visit_formula_proof fp in
     let split_clause = mkOther (ImmBuildDef not_xor1_clause) None in
-    store_non_root_clause split_clause
-    (* link not_xor1_clause split_clause;
-     * add_scertifs [(not_xor1_clause.kind, not_xor1_clause.value, not_xor1_clause)] split_clause *)
+    link not_xor1_clause split_clause;
+    split_clause
   (* | FDummy -> mkRoot  *)
 
 
@@ -115,20 +174,12 @@ let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t Sm
     let (cl1 : SmtAtom.Form.t SmtCertif.clause) = visit_clause_proof cp1 in
     let cl2 = visit_clause_proof cp2 in
     let res = mkRes cl1 cl2 [] in
-    (* add_scertifs [(cl1.kind, cl1.value, cl1); (cl2.kind, cl2.value, cl2)] res *)
-    store_non_root_clause res
+    link cl1 cl2;
+    link cl2 res;
+    res
   | Clause (fp, f) ->
     visit_formula_proof fp
     (* visit_formula f *)
   (* | Lemma (l) -> visit_lemma l *)
   (* | CDummy -> () *)
 
-let add_clauses_after_roots () =
-  print_string "pt_to_smtcoq: add_clauses_after_roots: Begin";
-  let (Some last_root) = !last_root_clause in
-  print_certif Form.to_smt Atom.to_smt last_root ".rootoutput";
-  let h :: tl = !non_root_clauses in
-  let _ = List.fold_left (fun oc nc -> link oc nc; nc) h tl in
-  let prepared_list = List.map (fun cl -> (cl.kind, cl.value, cl)) (h::tl) in
-  (* add_scertifs prepared_list last_root *)
-  last_root
