@@ -50,7 +50,7 @@ let import_trace ra' rf' fsmt fproof =
   Printf.printf "\n --- to SMTCoq: select\n";
   let certif = get_last certif in
   SmtTrace.select certif;
-  print_certif Form.to_smt Atom.to_smt certif ".certoutput_after_select";
+  (* print_certif Form.to_smt Atom.to_smt certif ".certoutput_after_select"; *)
   
   Printf.printf "\n --- to SMTCoq: occur\n";
   SmtTrace.occur certif;
@@ -60,7 +60,6 @@ let import_trace ra' rf' fsmt fproof =
   
   Printf.printf "\n --- to SMTCoq: adjust root positions\n";
   print_certif Form.to_smt Atom.to_smt certif ".certoutput2";
-  let re_hash = Form.hash_hform (Atom.hash_hatom ra') rf' in
   (max_id, certif)
 
 let clear_all () =
@@ -77,12 +76,16 @@ let import_all fsmt fproof =
   let rf' = VeritSyntax.rf' in
   let roots = Smtlib2_genConstr.import_smtlib2 rt ro ra rf fsmt in
   let (max_id, confl) = import_trace ra' rf' fsmt fproof in
-  print_certif Form.to_smt Atom.to_smt confl ".certoutputverit";
+  let re_hash = Form.hash_hform (Atom.hash_hatom ra') rf' in
+  (* print_certif Form.to_smt Atom.to_smt confl ".certoutputverit"; *)
   (rt, ro, ra, rf, roots, max_id, confl)
 (*
 Take an SMT2-formula and an SMTInterpol-proof and check whether the proof proves the formula unsatisfiable.
 This function is called when Coq calls the vernacular command 'Smtinterpol.checker'.
 *)
+let checkerdebug fsmt fproof =
+  SmtCommands.checker_debug (import_all fsmt fproof)
+
 let checker formula proof=
   (* import_all None proof; *)
   Printf.printf "When this line is printed, it means that the solver stub is 1) integrated correctly and 2) linked to the vernacular command 'Smtinterpol.checker'.";

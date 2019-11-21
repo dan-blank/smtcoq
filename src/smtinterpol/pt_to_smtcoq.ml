@@ -115,25 +115,49 @@ let rec pp_form = function
 (* let visit_formula = function
  *   | _ -> SmtTrace.mkRoot *)
 
-let rec visit_equality_proof = function
-  (* | Reflexivity (f) -> visit_formula f *)
-  (* | Transitivity (ep1, ep2) ->
-   *   let cl1 = visit_equality_proof ep1 in
-   *   let cl2 = visit_equality_proof ep2 in
-   *   mkRes cl1 cl2 [] *)
-  (* | Congruence (ep1, ep2) ->
-   *   (\* visit_equality_proof ep1;
-   *    * visit_equality_proof ep2 *\)
-   *     mkRoot *)
+let get_subformula f i =
+  let formula = Form.pform f in
+  match formula with
+  | Fapp (_, ar) -> Array.get ar i
+
+(* | Reflexivity (f) -> visit_formula f *)
+(* | Transitivity (ep1, ep2) ->
+ *   let cl1 = visit_equality_proof ep1 in
+ *   let cl2 = visit_equality_proof ep2 in
+ *   mkRes cl1 cl2 [] *)
+(* | Congruence (ep1, ep2) ->
+ *   (\* visit_equality_proof ep1;
+ *    * visit_equality_proof ep2 *\)
+ *     mkRoot *)
+let rec visit_equality_proof ep existsclause =
+  match ep with
   | Rewrite (formula, rule) ->
     Printf.printf ("\n hey ho ------------------ \n");
     (* Atom.print_atoms VeritSyntax.ra ".atomsoutput"; *)
     pp_form (Form.pform formula);
-    mkOther (BuildDef formula) None
+    let flit = get_subformula formula 0 in
+    let _ = Form.hash_hform (Atom.hash_hatom VeritSyntax.ra') VeritSyntax.rf' flit in
+    let sform = get_subformula formula 1 in
+    let slit = get_subformula sform 0 in
+    let tlit = get_subformula sform 1 in
+    (* let lit_ar = [flit ; slit; tlit] in *)
+    (* let lit_ar = [flit] in *)
+    (* let bform = Fapp (For, Array.of_list lit_ar) in *)
+    (* let bform = Form.pform formula in
+     * let reif = Form.create () in
+     * let realform = Form.get reif bform in *)
+    (* mkOther (BuildDef flit) (Some [flit; slit; tlit]) *)
+    mkOther (ImmBuildDef2 existsclause) None
+    (* mkOther (BuildDef flit) (Some [flit ]) *)
+      (* mkOther (BuildDef flit) None *)
+(* mkOther (ImmBuildDef existsclause) (Some lit_ar) end *)
+    (* mkOther (BuildDef (Form.get reif fformula)) (Some [flit]) *)
       (* mkRoot *)
   (* | EDummy -> mkRoot *)
-
-let rec visit_formula_proof = function
+let clone (type t) (x : t) : t = 
+  let buf = Marshal.(to_bytes x [No_sharing; Closures]) in
+  Marshal.from_bytes buf 0
+let rec visit_formula_proof = begin function
   (* | Tautology (f, _) -> visit_formula f *)
   | Asserted (f) ->
     Printf.printf ("\n hey Asserted ------------------ \n");
@@ -141,17 +165,23 @@ let rec visit_formula_proof = function
     mkRootV [f]
   | Equality (fp, ep) ->
     let fproof_clause = visit_formula_proof fp in
-    let eproof_clause = visit_equality_proof ep in
+    (* let imm_clause = mkOther (ImmBuildDef2 fproof_clause) None in
+     * link fproof_clause imm_clause; *)
+    let eproof_clause = visit_equality_proof ep fproof_clause in
     link fproof_clause eproof_clause;
     eproof_clause
-  | Split (fp, _, rule) ->
+  | Split (fp, f, rule) ->
     Printf.printf ("\n hey hey ------------------ \n");
     (* pp_form (Form.pform f); *)
     (* Visit formula proof *)
     let not_xor1_clause = visit_formula_proof fp in
-    let split_clause = mkOther (ImmBuildDef not_xor1_clause) None in
-    link not_xor1_clause split_clause;
-    split_clause
+    let flit = get_subformula f 0 in
+    let slit = get_subformula f 1 in
+    (* let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) (Some [flit; slit]) in
+     * (\* let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) (Some [f]) in *\)
+     * link not_xor1_clause split_clause;
+     * split_clause end *)
+    not_xor1_clause end
   (* | FDummy -> mkRoot  *)
 
 
