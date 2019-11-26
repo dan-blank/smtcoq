@@ -31,7 +31,7 @@ let remove_clause (c : 'a) : unit =
      link lc rc)
   
 let move_before_clause move_clause until_clause =
-  print_string "pt_to_smtcoq: move_before_clause BEGIN";
+  (* print_string "pt_to_smtcoq: move_before_clause BEGIN"; *)
   remove_clause move_clause;
   let prev_until_clause_o = until_clause.prev in
   (if isSome prev_until_clause_o then
@@ -46,17 +46,17 @@ let move_roots_to_beginning c =
   let first_non_root = ref c in
   (* let scan_clause non_root_was_encountered roots_after_non_root first_non_root *)
   let rec scan_clause cl =
-    print_string "\n+#+# scan is called!";
+    (* print_string "\n+#+# scan is called!"; *)
     (match cl.kind with
      | Root -> if !encountered then roots := cl :: !roots else encountered := true
      | _ -> if not !encountered then first_non_root := cl);
     (match cl.next with
      | None ->
-       print_string "None in scan";
+       (* print_string "None in scan"; *)
        ()
      | Some ncl -> scan_clause ncl) in
   scan_clause c;
-  print_string ("pt_to_smtcoq: move_roots_to_beginning " ^ (string_of_int (List.length !roots))) ;
+  (* print_string ("pt_to_smtcoq: move_roots_to_beginning " ^ (string_of_int (List.length !roots))) ; *)
   List.iter (fun root_to_move -> move_before_clause root_to_move !first_non_root) !roots
 
 let rec get_first c =
@@ -70,11 +70,11 @@ let rec get_last c =
   | None -> c
 
 let increment_root c new_pos =
-  print_string ("\n pt_to_smtcoq increment_root id: " ^ (string_of_int c.id) ^ " new_pos: " ^ (string_of_int new_pos));
+  (* print_string ("\n pt_to_smtcoq increment_root id: " ^ (string_of_int c.id) ^ " new_pos: " ^ (string_of_int new_pos)); *)
   match c.kind with
    | Root ->
      c.pos <- Some new_pos;
-     print_string ("\n pt_to_smtcoq Middle Root! " ^ (string_of_int new_pos))
+     (* print_string ("\n pt_to_smtcoq Middle Root! " ^ (string_of_int new_pos)) *)
    | _ -> ()
 
 let rec reposition_roots c pos =
@@ -129,34 +129,48 @@ let get_subformula f i =
  *   (\* visit_equality_proof ep1;
  *    * visit_equality_proof ep2 *\)
  *     mkRoot *)
+
+(* (iff x y) => (not (xor x y)) *)
+
+(* let tailref = ref [] *)
+
+let negate_formula f =
+  let reif = Form.create () in
+  let formula = Form.get reif f in 
+  SmtAtom.Form.neg (formula)
+
+let replace_fop_and_negate f =
+  match f with
+  | Fapp (Fiff, ar) ->
+    let dings = Fapp (Fxor, ar) in
+    negate_formula dings
+
+let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
+  match rewrite_rule with
+  | Rewrite_eqToXor ->
+    let eq_as_iff_a_b = get_subformula rewrite_formula 0 in
+    let eq_as_xor = get_subformula rewrite_formula 1 in
+    let a = get_subformula eq_as_iff_a_b 0 in
+    let b = get_subformula eq_as_iff_a_b 1 in
+    let bd1 = mkOther (BuildDef eq_as_xor) None in
+    let bd2 = mkOther (BuildDef2 eq_as_xor) None in
+    let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
+    let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
+    let res1 = mkRes bd1 id1 [] in
+    let res2 = mkRes bd2 id2 [res1] in
+    link rewritee_clause bd1;
+    link bd1 bd2;
+    link bd2 id1;
+    link id1 id2;
+    link id2 res1;
+    link res1 res2;
+    res2
+
+
 let rec visit_equality_proof ep existsclause =
   match ep with
-  | Rewrite (formula, rule) ->
-    Printf.printf ("\n hey ho ------------------ \n");
-    (* Atom.print_atoms VeritSyntax.ra ".atomsoutput"; *)
-    pp_form (Form.pform formula);
-    let flit = get_subformula formula 0 in
-    let _ = Form.hash_hform (Atom.hash_hatom VeritSyntax.ra') VeritSyntax.rf' flit in
-    let sform = get_subformula formula 1 in
-    let slit = get_subformula sform 0 in
-    let tlit = get_subformula sform 1 in
-    (* let lit_ar = [flit ; slit; tlit] in *)
-    (* let lit_ar = [flit] in *)
-    (* let bform = Fapp (For, Array.of_list lit_ar) in *)
-    (* let bform = Form.pform formula in
-     * let reif = Form.create () in
-     * let realform = Form.get reif bform in *)
-    (* mkOther (BuildDef flit) (Some [flit; slit; tlit]) *)
-    mkOther (ImmBuildDef2 existsclause) None
-    (* mkOther (BuildDef flit) (Some [flit ]) *)
-      (* mkOther (BuildDef flit) None *)
-(* mkOther (ImmBuildDef existsclause) (Some lit_ar) end *)
-    (* mkOther (BuildDef (Form.get reif fformula)) (Some [flit]) *)
-      (* mkRoot *)
-  (* | EDummy -> mkRoot *)
-let clone (type t) (x : t) : t = 
-  let buf = Marshal.(to_bytes x [No_sharing; Closures]) in
-  Marshal.from_bytes buf 0
+  | Rewrite (formula, rule) -> translate_rewrite existsclause rule formula
+
 let rec visit_formula_proof = begin function
   (* | Tautology (f, _) -> visit_formula f *)
   | Asserted (f) ->
@@ -168,7 +182,6 @@ let rec visit_formula_proof = begin function
     (* let imm_clause = mkOther (ImmBuildDef2 fproof_clause) None in
      * link fproof_clause imm_clause; *)
     let eproof_clause = visit_equality_proof ep fproof_clause in
-    link fproof_clause eproof_clause;
     eproof_clause
   | Split (fp, f, rule) ->
     Printf.printf ("\n hey hey ------------------ \n");
@@ -177,11 +190,11 @@ let rec visit_formula_proof = begin function
     let not_xor1_clause = visit_formula_proof fp in
     let flit = get_subformula f 0 in
     let slit = get_subformula f 1 in
-    (* let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) (Some [flit; slit]) in
-     * (\* let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) (Some [f]) in *\)
-     * link not_xor1_clause split_clause;
-     * split_clause end *)
-    not_xor1_clause end
+    (* let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) (Some [flit; slit]) in *)
+    let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) None in
+    link not_xor1_clause split_clause;
+    split_clause end
+    (* not_xor1_clause end *)
   (* | FDummy -> mkRoot  *)
 
 

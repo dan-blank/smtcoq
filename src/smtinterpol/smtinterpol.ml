@@ -49,6 +49,7 @@ let import_trace ra' rf' fsmt fproof =
 
   Printf.printf "\n --- to SMTCoq: select\n";
   let certif = get_last certif in
+  print_certif Form.to_smt Atom.to_smt certif ".certoutput41";
   SmtTrace.select certif;
   (* print_certif Form.to_smt Atom.to_smt certif ".certoutput_after_select"; *)
   
@@ -59,7 +60,7 @@ let import_trace ra' rf' fsmt fproof =
   let max_id = SmtTrace.alloc (get_first certif) in
   
   Printf.printf "\n --- to SMTCoq: adjust root positions\n";
-  print_certif Form.to_smt Atom.to_smt certif ".certoutput2";
+  print_certif Form.to_smt Atom.to_smt certif ".certoutput42";
   (max_id, certif)
 
 let clear_all () =
