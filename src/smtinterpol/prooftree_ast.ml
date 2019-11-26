@@ -6,13 +6,15 @@ type formula = SmtAtom.Form.t
 type tautology_rule = IteRed | ExcludedMiddle1
 
 type rewrite_rule =
-  | AndToOr
+  | Rewrite_andToOr
   | EqFalse
   | Rewrite_eqToXor
+  | Rewrite_notSimp
 
 type split_rule =
   | Split_xor_1
   | Split_xor_2
+  | Split_notOr
 
 type equality_proof =
     | Reflexivity          of formula

@@ -58,9 +58,12 @@ let string_of_single_atttribute = function
 let translate_split_annotation = function
   | ":xor-1" -> Split_xor_1
   | ":xor-2" -> Split_xor_2
+  | ":notOr" -> Split_notOr
 
 let translate_rewrite_annotation = function
   | ":eqToXor" -> Rewrite_eqToXor
+  | ":andToOr" -> Rewrite_andToOr
+  | ":notSimp" -> Rewrite_notSimp
 
 let translate_annotated_formula_term term annotation =
   match term with

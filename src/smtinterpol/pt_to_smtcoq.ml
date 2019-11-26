@@ -115,10 +115,12 @@ let rec pp_form = function
 (* let visit_formula = function
  *   | _ -> SmtTrace.mkRoot *)
 
+(* Get subformula OR return the atom *)
 let get_subformula f i =
   let formula = Form.pform f in
   match formula with
   | Fapp (_, ar) -> Array.get ar i
+  | Fatom form -> f
 
 (* | Reflexivity (f) -> visit_formula f *)
 (* | Transitivity (ep1, ep2) ->
@@ -145,33 +147,64 @@ let replace_fop_and_negate f =
     let dings = Fapp (Fxor, ar) in
     negate_formula dings
 
+let link_link_of_clauses ls =
+  match ls with
+  | [] -> ()
+  | h :: tl -> let _ = List.fold_left (fun l r -> link l r; r) h tl in ()
+
 let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
-  match rewrite_rule with
+  let eq_as_iff = get_subformula rewrite_formula 0 in
+  let eq_as_target = get_subformula rewrite_formula 1 in
+  let a = get_subformula eq_as_iff 0 in
+  let b = get_subformula eq_as_iff 1 in
+  let clauses = ref [rewritee_clause] in
+  (match rewrite_rule with
   | Rewrite_eqToXor ->
-    let eq_as_iff_a_b = get_subformula rewrite_formula 0 in
-    let eq_as_xor = get_subformula rewrite_formula 1 in
-    let a = get_subformula eq_as_iff_a_b 0 in
-    let b = get_subformula eq_as_iff_a_b 1 in
-    let bd1 = mkOther (BuildDef eq_as_xor) None in
-    let bd2 = mkOther (BuildDef2 eq_as_xor) None in
+    let bd1 = mkOther (BuildDef eq_as_target) None in
+    let bd2 = mkOther (BuildDef2 eq_as_target) None in
     let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
     let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
     let res1 = mkRes bd1 id1 [] in
     let res2 = mkRes bd2 id2 [res1] in
-    link rewritee_clause bd1;
-    link bd1 bd2;
-    link bd2 id1;
-    link id1 id2;
-    link id2 res1;
-    link res1 res2;
-    res2
+    clauses := List.append !clauses [bd1; bd2; id1; id2; res1; res2;]
+    (* res2 *)
+  | Rewrite_andToOr ->
+    let bd1 = mkOther (BuildDef eq_as_target) None in
+    let id1 = mkOther (ImmBuildProj (rewritee_clause, 0)) None in
+    let id2 = mkOther (ImmBuildProj (rewritee_clause, 1)) None in
+    let res = mkRes bd1 id1 [id2] in
+    clauses := List.append !clauses [bd1; id1; id2; res]
+  | Rewrite_notSimp ->
+    let simpl1 = mkOther (ImmFlatten (rewritee_clause, eq_as_target)) None in
+    clauses := List.append !clauses [simpl1]
+  );
+    (* simpl1 *)
+  link_link_of_clauses !clauses;
+  List.hd !clauses
+
+
+
+
+    (* rewritee_clause *)
+
+let translate_split unsplit_clause split_rule =
+  match split_rule with
+  | Split_xor_2 -> 
+    let split_clause = mkOther (ImmBuildDef2 unsplit_clause) None in
+    link unsplit_clause split_clause;
+    split_clause
+  | Split_notOr ->
+    (*  TODO: remove hardcoded index... need to detect correct index instead *)
+    let split_clause = mkOther (ImmBuildProj (unsplit_clause, 1)) None in
+    link unsplit_clause split_clause;
+    split_clause
 
 
 let rec visit_equality_proof ep existsclause =
   match ep with
   | Rewrite (formula, rule) -> translate_rewrite existsclause rule formula
 
-let rec visit_formula_proof = begin function
+let rec visit_formula_proof = function
   (* | Tautology (f, _) -> visit_formula f *)
   | Asserted (f) ->
     Printf.printf ("\n hey Asserted ------------------ \n");
@@ -184,31 +217,8 @@ let rec visit_formula_proof = begin function
     let eproof_clause = visit_equality_proof ep fproof_clause in
     eproof_clause
   | Split (fp, f, rule) ->
-    Printf.printf ("\n hey hey ------------------ \n");
-    (* pp_form (Form.pform f); *)
-    (* Visit formula proof *)
-    let not_xor1_clause = visit_formula_proof fp in
-    let flit = get_subformula f 0 in
-    let slit = get_subformula f 1 in
-    (* let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) (Some [flit; slit]) in *)
-    let split_clause = mkOther (ImmBuildDef2 not_xor1_clause) None in
-    link not_xor1_clause split_clause;
-    split_clause end
-    (* not_xor1_clause end *)
-  (* | FDummy -> mkRoot  *)
-
-
-(* let visit_lemma = function
- *   | L_CC_Transitivity (f, _, fl) ->
- *     (\* visit_formula f;
- *      * List.iter visit_formula fl; *\)
- *     mkRoot
- *   | L_CC_Congruence (f1, f2, f3, _) ->
- *     (\* visit_formula f1;
- *      * visit_formula f2;
- *      * visit_formula f3; *\)
- *     mkRoot *)
-    
+    let unsplit_clause = visit_formula_proof fp in
+    translate_split unsplit_clause rule
 
 let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t SmtCertif.clause =
   print_string "\npt_to_smtcoq: visit_clause_proof: Begin";
