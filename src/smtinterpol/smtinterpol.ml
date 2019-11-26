@@ -43,13 +43,13 @@ let import_trace ra' rf' fsmt fproof =
   Printf.printf "\n --- to SMTCoq: move roots to beinning\n";
   move_roots_to_beginning certif;
 
+  print_certif Form.to_smt Atom.to_smt certif ".certoutput41";
   Printf.printf "\n --- to SMTCoq: adjust root positions\n";
   let certif = get_first certif in
   reposition_roots certif (-1);
 
   Printf.printf "\n --- to SMTCoq: select\n";
   let certif = get_last certif in
-  print_certif Form.to_smt Atom.to_smt certif ".certoutput41";
   SmtTrace.select certif;
   (* print_certif Form.to_smt Atom.to_smt certif ".certoutput_after_select"; *)
   

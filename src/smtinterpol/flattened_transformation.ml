@@ -3,6 +3,7 @@ open Smtlib2_genConstr
 open Prooftree_ast
 open SmtForm
 open SmtAtom
+open Tabulation
 
 exception FlattenTransformationExpection of string
 
@@ -64,6 +65,7 @@ let translate_rewrite_annotation = function
   | ":eqToXor" -> Rewrite_eqToXor
   | ":andToOr" -> Rewrite_andToOr
   | ":notSimp" -> Rewrite_notSimp
+  | ":intern" -> Rewrite_intern
 
 let translate_annotated_formula_term term annotation =
   match term with
@@ -88,6 +90,8 @@ let rec translate_annotated_eproof_term term (closest_annotation: (Smtlib2_ast.l
     translate_eproof_term (string_of_qualidentifier i,tl) closest_annotation
 
 and translate_eproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
+  let (str,_) = termcontext in
+  print_string ("\n new eproof: " ^ str);
   match termcontext with
   | "@rewrite", [TermExclimationPt (_, TermQualIdTerm (_, _, (_, from :: goal :: _)), rewrite_annotation)] ->
     print_string "\n FT: translate_eproof_term => @rewrite";
@@ -103,6 +107,15 @@ and translate_eproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_a
     let new_form = Form.get reif (Fapp (For, Array.of_list [g ; f])) in
     Form.to_smt Atom.to_smt Format.std_formatter new_form;
     Rewrite (new_form, a)
+  | "@cong", [ep1_term; ep2_term] ->
+    let ep1 = translate_annotated_eproof_term ep1_term None in
+    let ep2 = translate_annotated_eproof_term ep2_term None in
+    Congruence (ep1, ep2)
+  | "@refl", [formula_term] ->
+    let formula = translate_annotated_formula_term formula_term None in
+    Reflexivity formula
+
+
 let rec translate_annotated_fproof_term term (closest_annotation: (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
   match term with
   | TermExclimationPt (_, t, a) ->
@@ -135,6 +148,35 @@ and translate_fproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_a
     raise (FlattenTransformationExpection "Formulaproof not supported yet!")
     (* FDummy *)
 
+let is_equality_term t =
+  Hashtbl.clear term_table; false
+
+let attribute_value_to_termlist av = []
+
+let construct_cc_lemma t av =
+  let ra = VeritSyntax.ra in
+  let rf = VeritSyntax.rf in
+  let fakestring = "(or (= (f z x) (f z y)) (not (= x y) ))" in
+  let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
+  let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in
+  L_CC_Congruence (fakeform, [])
+  (*   match attribute_value_to_termlist av with
+   * | h :: tl ->
+   *   let congruence_formula = translate_annotated_formula_term h h in
+   *   let path_formulas = List.map (fun lt -> translate_annotated_formula_term lt lt) tl in
+   *   if is_equality_term h
+   *   then
+   *     L_CC_Transitivity (congruence_formula, path_formulas)
+   *   else
+   *     L_CC_Congruence (congruence_formula, path_formulas)
+   * | [] -> raise (FlattenTransformationExpection "Error: CCLemma has no attibutes!") *)
+
+
+let handle_lemma_term t a =
+  match a with
+  | [AttributeKeywordValue (_, ":CC", av)] -> construct_cc_lemma t av
+
+
 let rec translate_annotated_clause_proof_term (term : Smtlib2_ast.term) (closest_annotation : (Smtlib2_ast.loc * (Smtlib2_ast.attribute list)) option) =
   match term with
   | TermExclimationPt (_, t, a) ->
@@ -155,10 +197,8 @@ and translate_clause_proof_term termcontext annotation =
     let fp = translate_annotated_fproof_term fpterm annotation in
     let f = translate_annotated_formula_term fterm annotation in
     Clause (fp, f)
-  | _, _ ->
-    print_string " SOMETHING DIFFERENT! ";
-    raise (FlattenTransformationExpection "Clauseproof not supported yet!")
-    (* CDummy *)
+  | "@lemma", [TermExclimationPt (_, t, (_, al))] ->
+    Lemma (handle_lemma_term t al)
 
 let rec translate_varbinding = function
   | VarBindingSymTerm (_, s, t) ->

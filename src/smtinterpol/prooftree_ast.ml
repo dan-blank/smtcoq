@@ -10,6 +10,7 @@ type rewrite_rule =
   | EqFalse
   | Rewrite_eqToXor
   | Rewrite_notSimp
+  | Rewrite_intern
 
 type split_rule =
   | Split_xor_1
@@ -31,8 +32,9 @@ type formula_proof =
   | FDummy
 
 type lemma =
-  | L_CC_Transitivity of formula * formula * formula list
-  | L_CC_Congruence of formula * formula * formula * formula
+  | L_CC_Transitivity of formula * formula list
+  | L_CC_Congruence of formula * formula list
+  (* | L_CC_Congruence of formula *)
 
 type clause_proof =
   | Resolution        of clause_proof * clause_proof

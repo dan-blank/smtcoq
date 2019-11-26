@@ -4,6 +4,7 @@ open SmtForm
 open SmtTrace
 open Printexc
 open SmtCertif
+open VeritSyntax
 
 exception ProofrulesToSMTCoqExpection of string
 
@@ -177,6 +178,7 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
   | Rewrite_notSimp ->
     let simpl1 = mkOther (ImmFlatten (rewritee_clause, eq_as_target)) None in
     clauses := List.append !clauses [simpl1]
+  | Rewrite_intern -> ()
   );
     (* simpl1 *)
   link_link_of_clauses !clauses;
@@ -203,11 +205,13 @@ let translate_split unsplit_clause split_rule =
 let rec visit_equality_proof ep existsclause =
   match ep with
   | Rewrite (formula, rule) -> translate_rewrite existsclause rule formula
+  | Congruence (lep, rep) -> visit_equality_proof lep existsclause
+  | Reflexivity formula -> mkRootV [formula]
 
 let rec visit_formula_proof = function
   (* | Tautology (f, _) -> visit_formula f *)
   | Asserted (f) ->
-    Printf.printf ("\n hey Asserted ------------------ \n");
+    (* Printf.printf ("\n hey Asserted ------------------ \n"); *)
     pp_form (Form.pform f);
     mkRootV [f]
   | Equality (fp, ep) ->
@@ -220,10 +224,22 @@ let rec visit_formula_proof = function
     let unsplit_clause = visit_formula_proof fp in
     translate_split unsplit_clause rule
 
+let handle_lemma = function
+  | L_CC_Congruence (f, _)->
+    (* let ra = VeritSyntax.ra in
+     * let rf = VeritSyntax.rf in
+     * let fakestring = "(= (f z x) (f z y)) (not (= x y)) (not (= z z))" in
+     * let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
+     * let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in *)
+    print_string "\n----- handle_lemma: returned root!";
+    pp_form (Form.pform f);
+    mkRootV [f]
+
 let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t SmtCertif.clause =
   print_string "\npt_to_smtcoq: visit_clause_proof: Begin";
   match f with
   | Resolution (cp1, cp2) ->
+    print_string "\n---- RESO!";
     let (cl1 : SmtAtom.Form.t SmtCertif.clause) = visit_clause_proof cp1 in
     let cl2 = visit_clause_proof cp2 in
     let res = mkRes cl1 cl2 [] in
@@ -231,8 +247,6 @@ let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t Sm
     link cl2 res;
     res
   | Clause (fp, f) ->
+    print_string "\n----- handle_clause: will return root!";
     visit_formula_proof fp
-    (* visit_formula f *)
-  (* | Lemma (l) -> visit_lemma l *)
-  (* | CDummy -> () *)
-
+  | Lemma l -> handle_lemma l
