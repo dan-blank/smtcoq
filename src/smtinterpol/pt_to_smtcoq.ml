@@ -40,33 +40,28 @@ let move_before_clause move_clause until_clause =
      link prev_until_clause move_clause);
   link move_clause until_clause
 
-let move_roots_to_beginning c =
+let rec find_first_non_root c =
+  if (not (isRoot c.kind))
+  then c
+  else
+    let Some n = c.next in
+    find_first_non_root n
 
-  let roots = ref [] in
-  let first_non_root = ref c in
-  (* let scan_clause non_root_was_encountered roots_after_non_root first_non_root *)
-  let rec scan_clause cl non_root_encountered_orig =
-    let non_root_encountered = ref non_root_encountered_orig in
-    print_string "\n+#+# scan is called!";
-    (match cl.kind with
-     | Root -> if !non_root_encountered then
-         print_string ("\n root encountered!" ^ (string_of_int cl.id));
-         roots := cl :: !roots
-     | _ -> if (not !non_root_encountered) then
-         print_string ("\n non root encountered!" ^ (string_of_int cl.id));
-       print_string (" first_non_root before is: " ^ (string_of_int !first_non_root.id));
-       non_root_encountered := true;
-       first_non_root := cl);
-    (match cl.next with
-     | None ->
-       (* print_string "None in scan"; *)
-       ()
-     | Some ncl -> scan_clause ncl !non_root_encountered) in
-  scan_clause c false;
-  (* print_string ("pt_to_smtcoq: move_roots_to_beginning " ^ (string_of_int (List.length !roots))) ; *)
-  List.iter (fun root_to_move ->
-print_string ("\n ****** pt_to_smtcoq: and another root: " ^ (string_of_int root_to_move.id) ^ " is moved before: " ^ (string_of_int !first_non_root.id) );
-      move_before_clause root_to_move !first_non_root) !roots
+(* Traverse list backwards!
+we want all roots after the first non root
+*)
+let rec take_while_cert goal c acc =
+  let newacc = 
+  (match c.kind with
+  | Root -> c :: acc
+  | _ -> acc) in
+  if (eq_clause goal c)
+  then newacc
+  else
+  (match c.prev with
+  | Some n -> take_while_cert goal n newacc
+  | None -> newacc)
+
 
 let rec get_first c =
   match c.prev with
@@ -77,6 +72,17 @@ let rec get_last c =
   match c.next with
   | Some n -> get_last n
   | None -> c
+
+(* Assumption: The first clause of the certificate is given. *)
+let move_roots_to_beginning c =
+
+  let first_non_root = find_first_non_root c in
+  let last_clause = get_last c in
+  let roots = take_while_cert first_non_root last_clause [] in
+  List.iter (fun root_to_move ->
+(* print_string ("\n ****** pt_to_smtcoq: and another root: " ^ (string_of_int root_to_move.id) ^ " is moved before: " ^ (string_of_int !first_non_root.id) ); *)
+      move_before_clause root_to_move first_non_root) roots
+
 
 let increment_root c new_pos =
   (* print_string ("\n pt_to_smtcoq increment_root id: " ^ (string_of_int c.id) ^ " new_pos: " ^ (string_of_int new_pos)); *)
@@ -192,11 +198,13 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
     (* equiv_neg2 (iff a b) a b} *)
     let bd1 = mkOther (BuildDef2 rewrite_formula) None in
     (* or_neg (or a_1 ... a_n) (not a_i) *)
-    let bp1 = mkOther (BuildProj ((Form.neg b), 0)) None in
+    let bp1 = mkOther (BuildProj (Form.neg (eq_as_target), 0)) None in
     (* and_pos (not (and a_1 ... a_n)) a_i *)
-    let bp2 = mkOther (BuildProj ((Form.neg a), 0)) None in
-    let res = mkRes bd1 bp1 [bp2] in
-    clauses := List.append !clauses [bd1; bp1; bp2; res]
+    let bp2 = mkOther (BuildProj (Form.neg (eq_as_iff), 0)) None in
+    let res1 = mkRes bd1 bp1 [] in
+    let res2 = mkRes bd1 bp2 [] in
+    let res3 = mkRes res1 res2 [] in
+    clauses := List.append !clauses [bd1; bp1; bp2; res1; res2; res3]
 
     (* let bd2 =  *)
     (* let bd1 = mkOther (BuildDef eq_as_target) None in
@@ -206,12 +214,11 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
      * clauses := List.append !clauses [bd1; id1; id2; res] *)
   | Rewrite_notSimp ->
     let simpl1 = mkOther (ImmFlatten (rewritee_clause, eq_as_target)) None in
-    let simpl2 = mkSame (simpl1) None in
-    clauses := List.append !clauses [simpl1; simpl2]
+    clauses := List.append !clauses [simpl1]
   | Rewrite_intern -> ()
   );
   link_link_of_clauses !clauses;
-  !clauses
+  List.hd !clauses
 
 
 
@@ -235,7 +242,12 @@ let rec visit_equality_proof ep existsclause =
   match ep with
   | Rewrite (formula, rule) -> translate_rewrite existsclause rule formula
   | Congruence (lep, rep) -> visit_equality_proof lep existsclause
-  | Reflexivity formula -> [mkRootV [formula]]
+  | Reflexivity formula -> mkRootV [formula]
+
+let is_simplification_rewrite pr =
+  match pr with
+  | Rewrite (_, Rewrite_notSimp) -> true
+  | _ -> false
 
 let rec visit_formula_proof = function
   (* | Tautology (f, _) -> visit_formula f *)
@@ -247,14 +259,22 @@ let rec visit_formula_proof = function
     let fproof_clause = visit_formula_proof fp in
     (* let imm_clause = mkOther (ImmBuildDef2 fproof_clause) None in
      * link fproof_clause imm_clause; *)
-    let first_cl :: tl_cls = visit_equality_proof ep fproof_clause in
-    let last_cl = List.hd (List.rev tl_cls) in
-    let ib1 = mkOther (ImmBuildDef2 last_cl) None in
-    let res = mkRes last_cl fproof_clause [] in
-    link fproof_clause first_cl;
-    link last_cl ib1;
-    link ib1 res;
-    res
+    let ep_cl = visit_equality_proof ep fproof_clause in
+    let first_cl = get_first ep_cl in
+    let last_cl = get_last ep_cl in
+    (if (is_simplification_rewrite ep)
+     then (
+       (* let res = mkRes last_cl fproof_clause [] in *)
+       (* link fproof_clause first_cl; *)
+       link fproof_clause last_cl;
+       last_cl)
+     else
+       let ib1 = mkOther (ImmBuildDef2 last_cl) None in
+       let res1 = mkRes fproof_clause ib1 [] in
+       link fproof_clause first_cl;
+       link last_cl ib1;
+       link ib1 res1;
+       res1)
   | Split (fp, f, rule) ->
     let unsplit_clause = visit_formula_proof fp in
     translate_split unsplit_clause rule

@@ -93,20 +93,21 @@ and translate_eproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_a
   let (str,_) = termcontext in
   print_string ("\n new eproof: " ^ str);
   match termcontext with
-  | "@rewrite", [TermExclimationPt (_, TermQualIdTerm (_, _, (_, from :: goal :: _)), rewrite_annotation)] ->
+  (* | "@rewrite", [TermExclimationPt (_, TermQualIdTerm (_, _, (_, from :: goal :: _)), rewrite_annotation)] -> *)
+  | "@rewrite", [TermExclimationPt (_, g, rewrite_annotation)] ->
     print_string "\n FT: translate_eproof_term => @rewrite";
     (* Format.fprintf Format.std_formatter "\n ACHTUNG ACHTUNG HIER IST DIE ANNOTATION!! \n";
      * print_string (string_of_single_atttribute (get_execption annotation)); *)
     (* print_term Format.std_formatter annotation; *)
-    let f = translate_annotated_formula_term from None in
-    let g = translate_annotated_formula_term goal None in
+    let f = translate_annotated_formula_term g None in
+    (* let g = translate_annotated_formula_term goal None in *)
     print_string "\n FT: AFTER f";
     let a = translate_rewrite_annotation (string_of_single_atttribute rewrite_annotation) in
     print_string "\n FT: AFTER a";
-    let reif = Form.create () in
-    let new_form = Form.get reif (Fapp (For, Array.of_list [g ; f])) in
-    Form.to_smt Atom.to_smt Format.std_formatter new_form;
-    Rewrite (new_form, a)
+    (* let reif = Form.create () in
+     * let new_form = Form.get reif (Fapp (For, Array.of_list [g ; f])) in
+     * Form.to_smt Atom.to_smt Format.std_formatter new_form; *)
+    Rewrite (f, a)
   | "@cong", [ep1_term; ep2_term] ->
     let ep1 = translate_annotated_eproof_term ep1_term None in
     let ep2 = translate_annotated_eproof_term ep2_term None in
