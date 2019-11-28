@@ -153,13 +153,12 @@ let is_equality_term t =
 
 let attribute_value_to_termlist av = []
 
-let construct_cc_lemma t av =
-  let ra = VeritSyntax.ra in
-  let rf = VeritSyntax.rf in
-  let fakestring = "(or (= (f z x) (f z y)) (not (= x y) ))" in
-  let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
-  let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in
-  L_CC_Congruence (fakeform, [])
+let construct_cc_lemma t _ =
+  match t with
+  | TermQualIdTerm (_, _, (_, h::tl)) ->
+    let main_form = translate_annotated_formula_term h None in
+    let neg_forms = List.map (fun fterm -> translate_annotated_formula_term fterm None) tl in
+    L_CC_Congruence (main_form, neg_forms)
   (*   match attribute_value_to_termlist av with
    * | h :: tl ->
    *   let congruence_formula = translate_annotated_formula_term h h in

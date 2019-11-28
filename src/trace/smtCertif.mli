@@ -9,7 +9,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 type used = int
 type clause_id = int
 type 'hform rule =
@@ -238,5 +237,5 @@ and 'hform resolution = {
   mutable rtail : 'hform clause list;
 }
 val used_clauses : 'a rule -> 'a clause list
-val to_string : 'a clause_kind -> string
+(* val to_string : 'a clause_kind -> string *)
 val print_certif : ('a -> Format.formatter -> 'b -> unit) -> 'a -> 'b clause -> string -> unit

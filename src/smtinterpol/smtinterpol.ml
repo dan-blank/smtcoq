@@ -14,6 +14,12 @@ open Flattened_transformation
 open Pt_to_smtcoq
 
 
+let rec print_certif_by_id c =
+  Printf.printf "%s" ("\n id is: " ^ (string_of_int c.id));
+  match c.next with
+  | Some n -> assert false; print_certif_by_id n
+  | _ -> ()
+
 (* Given a path to an SMT problem statement and an unsatisfiability proof produced by SMTInterpol, generate a SMTCoq certificate. *)
 let import_trace ra' rf' fsmt fproof =
   let chan = open_in fproof in
@@ -39,11 +45,14 @@ let import_trace ra' rf' fsmt fproof =
   Printf.printf "\n --- to SMTCoq: raw\n";
   let certif = visit_clause_proof prooftree in
   let certif = get_first certif in
-
-  Printf.printf "\n --- to SMTCoq: move roots to beinning\n";
-  move_roots_to_beginning certif;
-
   print_certif Form.to_smt Atom.to_smt certif ".certoutput41";
+
+  Printf.printf "\n --- to SMTCoq: move roots to beginning\n";
+  move_roots_to_beginning certif;
+  (* print_certif_by_id certif; *)
+  (* assert false; *)
+
+  print_certif Form.to_smt Atom.to_smt certif ".certoutput42";
   Printf.printf "\n --- to SMTCoq: adjust root positions\n";
   let certif = get_first certif in
   reposition_roots certif (-1);
@@ -60,7 +69,6 @@ let import_trace ra' rf' fsmt fproof =
   let max_id = SmtTrace.alloc (get_first certif) in
   
   Printf.printf "\n --- to SMTCoq: adjust root positions\n";
-  print_certif Form.to_smt Atom.to_smt certif ".certoutput42";
   (max_id, certif)
 
 let clear_all () =
@@ -78,6 +86,7 @@ let import_all fsmt fproof =
   let roots = Smtlib2_genConstr.import_smtlib2 rt ro ra rf fsmt in
   let (max_id, confl) = import_trace ra' rf' fsmt fproof in
   let re_hash = Form.hash_hform (Atom.hash_hatom ra') rf' in
+  Printf.printf "%s" "Hi ol";
   (* print_certif Form.to_smt Atom.to_smt confl ".certoutputverit"; *)
   (rt, ro, ra, rf, roots, max_id, confl)
 (*

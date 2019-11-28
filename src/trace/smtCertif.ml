@@ -9,7 +9,6 @@
 (*                                                                        *)
 (**************************************************************************)
 
-
 type used = int
 
 type clause_id  = int
@@ -268,7 +267,7 @@ let used_clauses r =
   | RowEq _ | RowNeq _ | Ext _ -> []
 
 (* For debugging certif processing purposes : <add_scertif> <select> <occur> <alloc> *)
-let to_string r =
+let to_string ftm atm fmt r =
   match r with
             Root -> "Root"
           | Same c -> "Same(" ^ string_of_int (c.id) ^ ")"
@@ -283,14 +282,32 @@ let to_string r =
                            | ImmFlatten _ -> "ImmFlatten"
                            | True -> "True"
                            | False -> "False"
-                           | BuildDef _ -> "BuildDef"
+                           | BuildDef f ->
+                             ftm atm fmt f;
+                             "BuildDef"
                            | BuildDef2 _ -> "BuildDef2"
-                           | BuildProj _ -> "BuildProj"
-                           | ImmBuildDef _ -> "ImmBuildDef"
-                           | ImmBuildDef2 _ -> "ImmBuildDef2"
-                           | ImmBuildProj _ -> "ImmBuildProj"
-                           | EqTr _ -> "EqTr"
-                           | EqCgr _ -> "EqCgr"
+                           | BuildProj (f, i) ->
+                             ftm atm fmt f;
+                             "BuildProj"
+                           | ImmBuildDef c ->
+                             print_string ("\n ImmBuildDef: " ^ string_of_int (c.id));
+                             "ImmBuildDef"
+                           | ImmBuildDef2 c ->
+                             print_string ("\n ImmBuilddef2: " ^ string_of_int (c.id));
+                             "ImmBuildDef2"
+                           | ImmBuildProj (c, _) ->
+                             print_string ("\n ImmBuildProj: " ^ string_of_int (c.id));
+                             "ImmBuildProj"
+                           | EqTr (f, ls) ->
+                             print_string ("\nEqTr , list is : " ^ (string_of_int (List.length ls)));
+                             ftm atm fmt f;
+                             (* print_string "\nEqTr END: "; *)
+                             "EqTr"
+                           | EqCgr (f, ns) ->
+                             print_string ("\nEqCgr");
+                             ftm atm fmt f;
+                             List.iter (fun (Some x) -> ftm atm fmt x) ns;
+                             "EqCgr"
                            | EqCgrP _ -> "EqCgrP"
                            | LiaMicromega _ -> "LiaMicromega"
                            | LiaDiseq _ -> "LiaDiseq"
@@ -321,7 +338,10 @@ let to_string r =
                            | Qf_lemma _ -> "Qf_lemma"
                          end ^ ")"
 
-
+let option_clause_to_int o =
+  match o with
+  | Some c -> c.id
+  | None -> -1
 
 (* To use <print_certif>, pass, as first and second argument, <Form.to_smt> and <Atom.to_string> *)
 let print_certif form_to_smt atom_to_string c where =
@@ -334,13 +354,13 @@ let print_certif form_to_smt atom_to_string c where =
   let fmt = Format.formatter_of_out_channel out_channel in
   let continue = ref true in
   while !continue do
-    let kind = to_string (!r.kind) in
+    let kind = to_string form_to_smt atom_to_string fmt (!r.kind) in
     let id = !r.id in
     let pos = match !r.pos with
       | None -> "None"
       | Some p -> string_of_int p in
     let used = !r.used in
-    Format.fprintf fmt "id:%i kind:%s pos:%s used:%i value:" id kind pos used;
+    Format.fprintf fmt "id:%i prev:%i next:%i kind:%s pos:%s used:%i value:" id (option_clause_to_int !r.prev) (option_clause_to_int !r.next) kind pos used;
     begin match !r.value with
     | None -> Format.fprintf fmt "None"
     | Some l -> List.iter (fun f -> form_to_smt atom_to_string fmt f;

@@ -25,7 +25,7 @@ let remove_clause (c : 'a) : unit =
    | Some (lc) ->
      c.prev <- None;
      lc.next <- None
-   | _ -> assert false);
+   | _ -> ());
   (if isSome lco && isSome rco then
      let Some lc = lco in
      let Some rc = rco in
@@ -42,23 +42,31 @@ let move_before_clause move_clause until_clause =
 
 let move_roots_to_beginning c =
 
-  let encountered = ref false in
   let roots = ref [] in
   let first_non_root = ref c in
   (* let scan_clause non_root_was_encountered roots_after_non_root first_non_root *)
-  let rec scan_clause cl =
-    (* print_string "\n+#+# scan is called!"; *)
+  let rec scan_clause cl non_root_encountered_orig =
+    let non_root_encountered = ref non_root_encountered_orig in
+    print_string "\n+#+# scan is called!";
     (match cl.kind with
-     | Root -> if !encountered then roots := cl :: !roots else encountered := true
-     | _ -> if not !encountered then first_non_root := cl);
+     | Root -> if !non_root_encountered then
+         print_string ("\n root encountered!" ^ (string_of_int cl.id));
+         roots := cl :: !roots
+     | _ -> if (not !non_root_encountered) then
+         print_string ("\n non root encountered!" ^ (string_of_int cl.id));
+       print_string (" first_non_root before is: " ^ (string_of_int !first_non_root.id));
+       non_root_encountered := true;
+       first_non_root := cl);
     (match cl.next with
      | None ->
        (* print_string "None in scan"; *)
        ()
-     | Some ncl -> scan_clause ncl) in
-  scan_clause c;
+     | Some ncl -> scan_clause ncl !non_root_encountered) in
+  scan_clause c false;
   (* print_string ("pt_to_smtcoq: move_roots_to_beginning " ^ (string_of_int (List.length !roots))) ; *)
-  List.iter (fun root_to_move -> move_before_clause root_to_move !first_non_root) !roots
+  List.iter (fun root_to_move ->
+print_string ("\n ****** pt_to_smtcoq: and another root: " ^ (string_of_int root_to_move.id) ^ " is moved before: " ^ (string_of_int !first_non_root.id) );
+      move_before_clause root_to_move !first_non_root) !roots
 
 let rec get_first c =
   match c.prev with
@@ -123,6 +131,13 @@ let get_subformula f i =
   | Fapp (_, ar) -> Array.get ar i
   | Fatom form -> f
 
+let get_first_subatom a i =
+  let rif = Atom.create () in
+  Atom.to_smt Format.std_formatter (Atom.get rif a) 
+  (* let atom = a in
+   * match atom with
+   * | Abop (_, a1, a2) -> a1 *)
+
 (* | Reflexivity (f) -> visit_formula f *)
 (* | Transitivity (ep1, ep2) ->
  *   let cl1 = visit_equality_proof ep1 in
@@ -153,36 +168,50 @@ let link_link_of_clauses ls =
   | [] -> ()
   | h :: tl -> let _ = List.fold_left (fun l r -> link l r; r) h tl in ()
 
+let mkSame r ov = mk_scertif (Same r) ov
+
 let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
   let eq_as_iff = get_subformula rewrite_formula 0 in
   let eq_as_target = get_subformula rewrite_formula 1 in
   let a = get_subformula eq_as_iff 0 in
   let b = get_subformula eq_as_iff 1 in
-  let clauses = ref [rewritee_clause] in
+  (* let clauses = ref [rewritee_clause] in *)
+  let clauses = ref [] in
   (match rewrite_rule with
-  | Rewrite_eqToXor ->
-    let bd1 = mkOther (BuildDef eq_as_target) None in
-    let bd2 = mkOther (BuildDef2 eq_as_target) None in
-    let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
-    let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
-    let res1 = mkRes bd1 id1 [] in
-    let res2 = mkRes bd2 id2 [res1] in
-    clauses := List.append !clauses [bd1; bd2; id1; id2; res1; res2;]
-    (* res2 *)
+  (* | Rewrite_eqToXor ->
+   *   (\* TODO: Das hier ist nur über IMplication, muss aber in beide Richtungen und damit unabhängig von rewritee_clause funktioniertn -> ImmBuildDefs nur benutzbar bei lokalen Clausen, falls überhaupt notwendig  *\)
+   *   let bd1 = mkOther (BuildDef eq_as_target) None in
+   *   let bd2 = mkOther (BuildDef2 eq_as_target) None in
+   *   let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
+   *   let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
+   *   let res1 = mkRes bd1 id1 [] in
+   *   let res2 = mkRes bd2 id2 [res1] in
+   *   clauses := List.append !clauses [bd1; bd2; id1; id2; res1; res2;]
+   *   (\* res2 *\) *)
   | Rewrite_andToOr ->
-    let bd1 = mkOther (BuildDef eq_as_target) None in
-    let id1 = mkOther (ImmBuildProj (rewritee_clause, 0)) None in
-    let id2 = mkOther (ImmBuildProj (rewritee_clause, 1)) None in
-    let res = mkRes bd1 id1 [id2] in
-    clauses := List.append !clauses [bd1; id1; id2; res]
+    (* equiv_neg2 (iff a b) a b} *)
+    let bd1 = mkOther (BuildDef2 rewrite_formula) None in
+    (* or_neg (or a_1 ... a_n) (not a_i) *)
+    let bp1 = mkOther (BuildProj ((Form.neg b), 0)) None in
+    (* and_pos (not (and a_1 ... a_n)) a_i *)
+    let bp2 = mkOther (BuildProj ((Form.neg a), 0)) None in
+    let res = mkRes bd1 bp1 [bp2] in
+    clauses := List.append !clauses [bd1; bp1; bp2; res]
+
+    (* let bd2 =  *)
+    (* let bd1 = mkOther (BuildDef eq_as_target) None in
+     * let id1 = mkOther (ImmBuildProj (rewritee_clause, 0)) None in
+     * let id2 = mkOther (ImmBuildProj (rewritee_clause, 1)) None in
+     * let res = mkRes bd1 id1 [id2] in
+     * clauses := List.append !clauses [bd1; id1; id2; res] *)
   | Rewrite_notSimp ->
     let simpl1 = mkOther (ImmFlatten (rewritee_clause, eq_as_target)) None in
-    clauses := List.append !clauses [simpl1]
+    let simpl2 = mkSame (simpl1) None in
+    clauses := List.append !clauses [simpl1; simpl2]
   | Rewrite_intern -> ()
   );
-    (* simpl1 *)
   link_link_of_clauses !clauses;
-  List.hd !clauses
+  !clauses
 
 
 
@@ -191,10 +220,10 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
 
 let translate_split unsplit_clause split_rule =
   match split_rule with
-  | Split_xor_2 -> 
-    let split_clause = mkOther (ImmBuildDef2 unsplit_clause) None in
-    link unsplit_clause split_clause;
-    split_clause
+  (* | Split_xor_2 -> 
+   *   let split_clause = mkOther (ImmBuildDef2 unsplit_clause) None in
+   *   link unsplit_clause split_clause;
+   *   split_clause *)
   | Split_notOr ->
     (*  TODO: remove hardcoded index... need to detect correct index instead *)
     let split_clause = mkOther (ImmBuildProj (unsplit_clause, 1)) None in
@@ -206,7 +235,7 @@ let rec visit_equality_proof ep existsclause =
   match ep with
   | Rewrite (formula, rule) -> translate_rewrite existsclause rule formula
   | Congruence (lep, rep) -> visit_equality_proof lep existsclause
-  | Reflexivity formula -> mkRootV [formula]
+  | Reflexivity formula -> [mkRootV [formula]]
 
 let rec visit_formula_proof = function
   (* | Tautology (f, _) -> visit_formula f *)
@@ -218,22 +247,48 @@ let rec visit_formula_proof = function
     let fproof_clause = visit_formula_proof fp in
     (* let imm_clause = mkOther (ImmBuildDef2 fproof_clause) None in
      * link fproof_clause imm_clause; *)
-    let eproof_clause = visit_equality_proof ep fproof_clause in
-    eproof_clause
+    let first_cl :: tl_cls = visit_equality_proof ep fproof_clause in
+    let last_cl = List.hd (List.rev tl_cls) in
+    let ib1 = mkOther (ImmBuildDef2 last_cl) None in
+    let res = mkRes last_cl fproof_clause [] in
+    link fproof_clause first_cl;
+    link last_cl ib1;
+    link ib1 res;
+    res
   | Split (fp, f, rule) ->
     let unsplit_clause = visit_formula_proof fp in
     translate_split unsplit_clause rule
+(* let hack_replace_atom_op a op = *)
 
-let handle_lemma = function
-  | L_CC_Congruence (f, _)->
-    (* let ra = VeritSyntax.ra in
-     * let rf = VeritSyntax.rf in
-     * let fakestring = "(= (f z x) (f z y)) (not (= x y)) (not (= z z))" in
-     * let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
-     * let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in *)
-    print_string "\n----- handle_lemma: returned root!";
-    pp_form (Form.pform f);
-    mkRootV [f]
+
+let rec hack_replace_level1_by_op f op =
+  pp_form (Form.pform f);
+  match Form.pform f with
+  (* | Fatom formu -> hack_replace_level1_by_op formu op *)
+  | Fapp (fo, _) ->
+    negate_formula (Fapp (fo, Array.of_list [op; op]))
+
+(* let handle_lemma = function
+ *   | L_CC_Congruence (f, ns)->
+ *     (\* let ra = VeritSyntax.ra in
+ *      * let rf = VeritSyntax.rf in
+ *      * let fakestring = "(= (f z x) (f z y)) (not (= x y)) (not (= z z))" in
+ *      * let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
+ *      * let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in *\)
+ *     print_string "\n----- handle_lemma: returned root!";
+ *     let (Fatom subform1) = Form.pform (get_subformula f 0) in
+ *     let reif = Atom.create () in
+ *     let subatom1 = get_first_subatom (Atom.atom subform1) in
+ *     (\* let op2 = get_first_subatom subatom1 () in *\)
+ *     Atom.to_smt Format.std_formatter subatom1 ;
+ *     (\* let subform2 = get_subformula f 9 in
+ *      * let changed = hack_replace_level1_by_op subform2 op2 in
+ *      * let newns = changed :: ns in *\)
+ *     pp_form (Form.pform f);
+ *     pp_form (Form.pform f);
+ *     pp_form (Form.pform f);
+ *     (\* mkOther (EqCgr (f, List.map (fun x -> Some x) newns)) None *\)
+ *     mkOther (EqCgr (f, List.map (fun x -> Some x) ns)) None *)
 
 let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t SmtCertif.clause =
   print_string "\npt_to_smtcoq: visit_clause_proof: Begin";
@@ -249,4 +304,4 @@ let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t Sm
   | Clause (fp, f) ->
     print_string "\n----- handle_clause: will return root!";
     visit_formula_proof fp
-  | Lemma l -> handle_lemma l
+  (* | Lemma l -> handle_lemma l *)

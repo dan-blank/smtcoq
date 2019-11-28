@@ -5,9 +5,6 @@ open Modified_smtlib2_printing
 (* This table contains terms that result from tabulating the initial SMTInterpol proof. It contains no let terms and no SexprInParens.   *)
 let term_table : (string, term) Hashtbl.t = Hashtbl.create 17 
 
-(* This table contains lists of terms that result from tabulating the initial SMTInterpol proof. The only way to create a lists of terms is to use a SexprInParens as part of an AttributeValSexpr.   *)
-let term_list_table : (string, term list) Hashtbl.t = Hashtbl.create 17 
-
 (* A counter to ensure that terms in term_table introduced by attributes have a unique name. *)
 let attribute_counter = ref 0
 
@@ -73,9 +70,9 @@ let transform_sexpr_list = function
 (* Given a tuple of a String keyword and a sexpr attribute-value, transform any term in that attribute-value into a symbol. Any term transformed this way is put into the termtable. Return an attribute-value where every occurrence of an term is replaced by the corresponding symbol.*)
 let flatten_attribute_keyword_value_sexpr = function
   | ":CC", AttributeValSexpr (l1, (l2, at :: a :: sl)) ->
-    let flattened_annotated_term = transform_sexpr_to_term_and_return_symbol at in
-    let flattened_sexpr_list = transform_sexpr_list sl in
-    AttributeValSexpr (l1, (l2, at :: a :: flattened_sexpr_list))
+    let tabulated_annotated_term = transform_sexpr_to_term_and_return_symbol at in
+    let tabulated_sexpr_list = transform_sexpr_list sl in
+    AttributeValSexpr (l1, (l2, tabulated_annotated_term  :: a :: tabulated_sexpr_list))
 
 (******************************************************************************)
 (* Tabulate functions that visit values defined in SmtLib2_ast.                *)
@@ -90,21 +87,21 @@ let tabulate_attribute_value annotation_name = function
 let tabulate_attribute = function
   | AttributeKeyword (_, _) as wa -> wa
   | AttributeKeywordValue (l1, an, av) ->
-    let flattened_attribute_value = tabulate_attribute_value an av in
-    AttributeKeywordValue (l1, an, flattened_attribute_value)
+    let tabulated_attribute_value = tabulate_attribute_value an av in
+    AttributeKeywordValue (l1, an, tabulated_attribute_value)
 
 
 let rec tabulate_varbinding = function
   | VarBindingSymTerm (_, s, t) ->
     (* let tabulate_term t 
-     * let flattened_term = get_corresponding_term_default s t in *)
+     * let tabulated_term = get_corresponding_term_default s t in *)
     Hashtbl.add term_table (string_of_symbol s) (tabulate_term t)
 (*TODO Apply to subterms too!*)
 and tabulate_term = function
   | TermSpecConst (_, c) as wt -> wt
   | TermQualIdTerm (l1, i, (l2, tl)) as wt ->
-    let flattened_terms = List.map tabulate_term tl in
-    TermQualIdTerm (l1, i, (l2, flattened_terms))
+    let tabulated_terms = List.map tabulate_term tl in
+    TermQualIdTerm (l1, i, (l2, tabulated_terms))
   | TermQualIdentifier (l, i) when String.get (string_of_qualidentifier i) 0 == '.'->
     get_corresponding_term_default (symbol_of_qualidentifier i) (TermQualIdentifier (l,i))
   | TermQualIdentifier (_, _) as wt -> wt
@@ -113,9 +110,9 @@ and tabulate_term = function
     tabulate_term t
   | TermExistsTerm (_, (_, sv), t) as wt -> wt
   | TermExclimationPt (loc, t, (loc2, al)) as wt ->
-    let flattened_subterm = tabulate_term t in
-    let flattened_attributes = List.map tabulate_attribute al in
-    TermExclimationPt (loc, flattened_subterm, (loc2, flattened_attributes))
+    let tabulated_subterm = tabulate_term t in
+    let tabulated_attributes = List.map tabulate_attribute al in
+    TermExclimationPt (loc, tabulated_subterm, (loc2, tabulated_attributes))
 
 
 (* Given an proof of type term, create two tables containg the preprocessed terms and term lists. *)

@@ -133,6 +133,7 @@ let set_same c nc =
   skip c
 
 let rec get_pos c =
+  (* print_string (to_string c.kind); *)
   match c.kind with
   | Root | Res _ | Other _ ->
       begin match c.pos with
@@ -257,11 +258,14 @@ let select c =
 (* Compute the number of occurence of each clause so that <alloc> works 
 properly *)
 let rec occur c =
+  print_string ("\noccur is called! id: " ^ (string_of_int c.id));
   match c.kind with
-  | Root -> c.used <- c.used + 1
+  | Root ->
+    print_string "\n... and we are in root!";
+    c.used <- c.used + 1
   | Res res ->
       if c.used == notUsed then
-	begin occur res.rc1; occur res.rc2; List.iter occur res.rtail end;
+	      begin occur res.rc1; occur res.rc2; List.iter occur res.rtail end;
       c.used <- c.used + 1
   | Other res ->
      if c.used == notUsed then List.iter occur (used_clauses res);
@@ -313,7 +317,8 @@ let alloc c =
     begin try match !free_pos with
               | p::free -> free_pos := free; !r.pos <- Some p
               | _ -> incr last_set; !r.pos <- Some !last_set
-          with _ -> failwith (to_string !r.kind)
+          (* with _ -> failwith (to_string !r.kind) *)
+             with _ -> failwith ("Temporary not available")
     end;
     match !r.next with
     | None -> continue := false

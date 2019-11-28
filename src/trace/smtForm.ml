@@ -189,7 +189,7 @@ module Make (Atom:ATOM) =
          | For -> Format.fprintf fmt "or"
          | Fxor -> Format.fprintf fmt "xor"
          | Fimp -> Format.fprintf fmt "=>"
-         | Fiff -> Format.fprintf fmt "="
+         | Fiff -> Format.fprintf fmt "iff"
          | Fite -> Format.fprintf fmt "ite"
          | Fnot2 _ -> ()
          | Fforall l ->

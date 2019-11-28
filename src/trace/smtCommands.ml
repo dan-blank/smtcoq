@@ -81,6 +81,7 @@ let cName_Hole= gen_constant euf_checker_modules "Name_Hole"
 (* Given an SMT-LIB2 file and a certif, build the corresponding objects *)
 
 let compute_roots roots last_root =
+  print_string "* compute_roots";
   let r = ref last_root in
   while (has_prev !r) do
     r := prev !r
@@ -88,15 +89,23 @@ let compute_roots roots last_root =
 
   let rec find_root i root = function
     | [] -> assert false
-    | t::q -> if Form.equal t root then i else find_root (i+1) root q in
+    | t::q ->
+      print_string ("* find_root i: " ^ (string_of_int i) ^ "\n") ;
+      Form.to_smt Atom.to_smt Format.std_formatter t;
+      print_string "\n" ;
+      Form.to_smt Atom.to_smt Format.std_formatter root;
+      if Form.equal t root then
+        (print_string "* found! "; i)
+else find_root (i+1) root q in
 
   let rec used_roots acc r =
     if isRoot r.kind then
-      match r.value with
+   (print_string ("\n used_roots i: " ^ (string_of_int r.id)) ;
+    match r.value with
         | Some [root] ->
            let j = find_root 0 root roots in
            used_roots (j::acc) (next r)
-        | _ -> assert false
+        | _ -> assert false)
     else acc
   in
 
@@ -261,6 +270,7 @@ let theorem name (rt, ro, ra, rf, roots, max_id, confl) =
 (* Given an SMT-LIB2 file and a certif, call the checker *)
 
 let checker (rt, ro, ra, rf, roots, max_id, confl) =
+  print_string ("* 1 checker" ^ (string_of_int (List.length roots)) );
   let nti = Structures.mkName "t_i" in
   let ntfunc = Structures.mkName "t_func" in
   let ntatom = Structures.mkName "t_atom" in
@@ -288,6 +298,7 @@ let checker (rt, ro, ra, rf, roots, max_id, confl) =
   let certif =
     mklApp cCertif [|v 4(*t_i*); v 3(*t_func*); v 2(*t_atom*); v 1(* t_form *); mkInt (max_id + 1); tres;mkInt (get_pos confl)|] in
 
+  print_string ("* 2 checker" ^ (string_of_int (List.length roots)) );
   let used_roots = compute_roots roots last_root in
   let used_rootsCstr =
     let l = List.length used_roots in
