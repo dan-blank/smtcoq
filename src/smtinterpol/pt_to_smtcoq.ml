@@ -177,45 +177,42 @@ let link_link_of_clauses ls =
 let mkSame r ov = mk_scertif (Same r) ov
 
 let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
-  let eq_as_iff = get_subformula rewrite_formula 0 in
-  let eq_as_target = get_subformula rewrite_formula 1 in
-  let a = get_subformula eq_as_iff 0 in
-  let b = get_subformula eq_as_iff 1 in
-  (* let clauses = ref [rewritee_clause] in *)
+  let lhs = get_subformula rewrite_formula 0 in
+  let rhs = get_subformula rewrite_formula 1 in
   let clauses = ref [] in
   (match rewrite_rule with
   (* | Rewrite_eqToXor ->
    *   (\* TODO: Das hier ist nur über IMplication, muss aber in beide Richtungen und damit unabhängig von rewritee_clause funktioniertn -> ImmBuildDefs nur benutzbar bei lokalen Clausen, falls überhaupt notwendig  *\)
-   *   let bd1 = mkOther (BuildDef eq_as_target) None in
-   *   let bd2 = mkOther (BuildDef2 eq_as_target) None in
+   *   let bd1 = mkOther (BuildDef rhs) None in
+   *   let bd2 = mkOther (BuildDef2 rhs) None in
    *   let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
    *   let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
    *   let res1 = mkRes bd1 id1 [] in
    *   let res2 = mkRes bd2 id2 [res1] in
    *   clauses := List.append !clauses [bd1; bd2; id1; id2; res1; res2;]
    *   (\* res2 *\) *)
-  | Rewrite_andToOr ->
-    (* equiv_neg2 (iff a b) a b} *)
-    let bd1 = mkOther (BuildDef2 rewrite_formula) None in
-    (* or_neg (or a_1 ... a_n) (not a_i) *)
-    let bp1 = mkOther (BuildProj (Form.neg (eq_as_target), 0)) None in
-    (* and_pos (not (and a_1 ... a_n)) a_i *)
-    let bp2 = mkOther (BuildProj (Form.neg (eq_as_iff), 0)) None in
-    let res1 = mkRes bd1 bp1 [] in
-    let res2 = mkRes bd1 bp2 [] in
-    let res3 = mkRes res1 res2 [] in
-    clauses := List.append !clauses [bd1; bp1; bp2; res1; res2; res3]
-
-    (* let bd2 =  *)
-    (* let bd1 = mkOther (BuildDef eq_as_target) None in
-     * let id1 = mkOther (ImmBuildProj (rewritee_clause, 0)) None in
-     * let id2 = mkOther (ImmBuildProj (rewritee_clause, 1)) None in
-     * let res = mkRes bd1 id1 [id2] in
-     * clauses := List.append !clauses [bd1; id1; id2; res] *)
-  | Rewrite_notSimp ->
-    let simpl1 = mkOther (ImmFlatten (rewritee_clause, eq_as_target)) None in
-    clauses := List.append !clauses [simpl1]
-  | Rewrite_intern -> ()
+   | Rewrite_andToOr ->
+     let base_1 = mkOther (BuildDef2 rewrite_formula) None in
+     (* Resolve to (iff a b) x *)
+     let prod_and_1 = mkOther (BuildProj (lhs, 0)) None in
+     let prod_or_1 = mkOther (BuildProj (rhs, 0)) None in
+     let res_x = mkRes base_1 prod_and_1 [prod_or_1] in
+     (* Resolve to (iff a b) y *)
+     let prod_and_2 = mkOther (BuildProj (lhs, 1)) None in
+     let prod_or_2 = mkOther (BuildProj (rhs, 1)) None in
+     let res_y = mkRes base_1 prod_and_2 [prod_or_2] in
+     (* Resolve to (iff a b) (not x) (not y)*)
+     let base2 = mkOther (BuildDef rewrite_formula) None in
+     let sum_and = mkOther (BuildDef lhs) None in
+     let sum_or = mkOther (BuildDef rhs) None in
+     let res_nx_ny = mkRes base2 sum_and [sum_or] in
+     (* Resolve to (iff a b) *)
+     let res = mkRes res_nx_ny res_x [res_y] in
+     clauses := List.append !clauses [base_1; prod_and_1; prod_or_1; res_x; prod_and_2; prod_or_2; res_y; base2; sum_and; sum_or; res_nx_ny; res]
+   | Rewrite_notSimp ->
+     let simpl1 = mkOther (ImmFlatten (rewritee_clause, rhs)) None in
+     clauses := List.append !clauses [simpl1]
+   | Rewrite_intern -> ()
   );
   link_link_of_clauses !clauses;
   List.hd !clauses
@@ -249,6 +246,13 @@ let is_simplification_rewrite pr =
   | Rewrite (_, Rewrite_notSimp) -> true
   | _ -> false
 
+let get_whole_and_sub_formulas rewrite_proof_rule =
+  match rewrite_proof_rule with
+  | Rewrite (r_formula, _) ->
+    let lhs = get_subformula r_formula 0 in
+    let rhs = get_subformula r_formula 1 in
+    (r_formula, lhs, rhs)
+
 let rec visit_formula_proof = function
   (* | Tautology (f, _) -> visit_formula f *)
   | Asserted (f) ->
@@ -269,8 +273,9 @@ let rec visit_formula_proof = function
        link fproof_clause last_cl;
        last_cl)
      else
-       let ib1 = mkOther (ImmBuildDef2 last_cl) None in
-       let res1 = mkRes fproof_clause ib1 [] in
+       let (a,b,c) = get_whole_and_sub_formulas ep in
+       let ib1 = mkOther (ImmBuildDef2 last_cl) (Some [Form.neg b;c]) in
+       let res1 = mkRes ib1 fproof_clause [] in
        link fproof_clause first_cl;
        link last_cl ib1;
        link ib1 res1;
