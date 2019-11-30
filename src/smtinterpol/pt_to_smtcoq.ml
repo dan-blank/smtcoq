@@ -181,16 +181,51 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
   let rhs = get_subformula rewrite_formula 1 in
   let clauses = ref [] in
   (match rewrite_rule with
-  (* | Rewrite_eqToXor ->
-   *   (\* TODO: Das hier ist nur über IMplication, muss aber in beide Richtungen und damit unabhängig von rewritee_clause funktioniertn -> ImmBuildDefs nur benutzbar bei lokalen Clausen, falls überhaupt notwendig  *\)
-   *   let bd1 = mkOther (BuildDef rhs) None in
-   *   let bd2 = mkOther (BuildDef2 rhs) None in
-   *   let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
-   *   let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
-   *   let res1 = mkRes bd1 id1 [] in
-   *   let res2 = mkRes bd2 id2 [res1] in
-   *   clauses := List.append !clauses [bd1; bd2; id1; id2; res1; res2;]
-   *   (\* res2 *\) *)
+   | Rewrite_eqToXor ->
+     let base_pos = mkOther (BuildDef2 rewrite_formula) None in
+     let base_neg = mkOther (BuildDef rewrite_formula) None in
+     (* Resolve to (iff a b) x (not y) *)
+     let choose_nx_y_1 = mkOther (BuildDef (Form.neg lhs)) None in
+     let choose_nx_y_2 = mkOther (BuildDef (Form.neg rhs)) None in
+     let res_nx_y = mkRes base_pos choose_nx_y_1 [choose_nx_y_2] in
+     (* Resolve to (iff a b) x y *)
+     let choose_x_y_1 = mkOther (BuildDef2 lhs) None in
+     let choose_x_y_2 = mkOther (BuildDef rhs) None in
+     let res_x_y = mkRes base_neg choose_x_y_1 [choose_x_y_2] in
+     (* Resolve to (iff a b) x *)
+     let res_x = mkRes res_x_y res_nx_y [] in
+
+     (* Resolve to (iff a b) (not x) (not y) *)
+     let choose_x_ny_1 = mkOther (BuildDef lhs) None in
+     let choose_x_ny_2 = mkOther (BuildDef2 rhs) None in
+     let res_x_ny = mkRes base_neg choose_x_ny_1 [choose_x_ny_2] in
+     (* Resolve to (iff a b) (not x) y *)
+     let choose_nx_ny_1 = mkOther (BuildDef2 (Form.neg lhs)) None in
+     let choose_nx_ny_2 = mkOther (BuildDef2 (Form.neg rhs)) None in
+     let res_nx_ny = mkRes base_pos choose_nx_ny_1 [choose_nx_ny_2] in
+     (* Resolve to (iff a b) (not x) *)
+     let res_nx = mkRes res_x_ny res_nx_ny [] in
+
+     let res = mkRes res_x res_nx [] in
+
+     clauses := List.append !clauses [base_pos; base_neg; choose_nx_y_1; choose_nx_y_2; res_nx_y; choose_x_y_1; choose_x_y_2; res_x_y; res_x; choose_x_ny_1; choose_x_ny_2; res_x_ny; choose_nx_ny_1; choose_nx_ny_2; res_nx_ny; res_nx; res]
+
+     (* Resolve to (iff a b) (not x) y *)
+     (* Resolve to (iff a b) (not x) y *)
+
+
+
+
+
+    (* (\* TODO: Das hier ist nur über IMplication, muss aber in beide Richtungen und damit unabhängig von rewritee_clause funktioniertn -> ImmBuildDefs nur benutzbar bei lokalen Clausen, falls überhaupt notwendig  *\)
+     * let bd1 = mkOther (BuildDef rhs) None in
+     * let bd2 = mkOther (BuildDef2 rhs) None in
+     * let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
+     * let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
+     * let res1 = mkRes bd1 id1 [] in
+     * let res2 = mkRes bd2 id2 [res1] in
+     * clauses := List.append !clauses [bd1; bd2; id1; id2; res1; res2;] *)
+    (* res2 *)
    | Rewrite_andToOr ->
      let base_1 = mkOther (BuildDef2 rewrite_formula) None in
      (* Resolve to (iff a b) x *)
@@ -201,7 +236,7 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
      let prod_and_2 = mkOther (BuildProj (lhs, 1)) None in
      let prod_or_2 = mkOther (BuildProj (rhs, 1)) None in
      let res_y = mkRes base_1 prod_and_2 [prod_or_2] in
-     (* Resolve to (iff a b) (not x) (not y)*)
+     (* Resolve to (iff a b) (not x) (not y) *)
      let base2 = mkOther (BuildDef rewrite_formula) None in
      let sum_and = mkOther (BuildDef lhs) None in
      let sum_or = mkOther (BuildDef rhs) None in
@@ -224,10 +259,10 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
 
 let translate_split unsplit_clause split_rule =
   match split_rule with
-  (* | Split_xor_2 -> 
-   *   let split_clause = mkOther (ImmBuildDef2 unsplit_clause) None in
-   *   link unsplit_clause split_clause;
-   *   split_clause *)
+  | Split_xor_2 -> 
+    let split_clause = mkOther (ImmBuildDef2 unsplit_clause) None in
+    link unsplit_clause split_clause;
+    split_clause
   | Split_notOr ->
     (*  TODO: remove hardcoded index... need to detect correct index instead *)
     let split_clause = mkOther (ImmBuildProj (unsplit_clause, 1)) None in
