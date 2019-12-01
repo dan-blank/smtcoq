@@ -208,8 +208,8 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
 
      let res = mkRes res_x res_nx [] in
 
-     clauses := List.append !clauses [base_pos; base_neg; choose_nx_y_1; choose_nx_y_2; res_nx_y; choose_x_y_1; choose_x_y_2; res_x_y; res_x; choose_x_ny_1; choose_x_ny_2; res_x_ny; choose_nx_ny_1; choose_nx_ny_2; res_nx_ny; res_nx; res]
-
+     clauses := List.append !clauses [base_pos; base_neg; choose_nx_y_1; choose_nx_y_2; res_nx_y; choose_x_y_1; choose_x_y_2; res_x_y; res_x; choose_x_ny_1; choose_x_ny_2; res_x_ny; choose_nx_ny_1; choose_nx_ny_2; res_nx_ny; res_nx; res];
+         link_link_of_clauses !clauses;
      (* Resolve to (iff a b) (not x) y *)
      (* Resolve to (iff a b) (not x) y *)
 
@@ -243,13 +243,16 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
      let res_nx_ny = mkRes base2 sum_and [sum_or] in
      (* Resolve to (iff a b) *)
      let res = mkRes res_nx_ny res_x [res_y] in
-     clauses := List.append !clauses [base_1; prod_and_1; prod_or_1; res_x; prod_and_2; prod_or_2; res_y; base2; sum_and; sum_or; res_nx_ny; res]
+     clauses := List.append !clauses [base_1; prod_and_1; prod_or_1; res_x; prod_and_2; prod_or_2; res_y; base2; sum_and; sum_or; res_nx_ny; res];
+         link_link_of_clauses !clauses;
    | Rewrite_notSimp ->
      let simpl1 = mkOther (ImmFlatten (rewritee_clause, rhs)) None in
-     clauses := List.append !clauses [simpl1]
-   | Rewrite_intern -> ()
+     clauses := List.append !clauses [simpl1];
+         link_link_of_clauses !clauses;
+   | Rewrite_intern ->
+     (* let refl = mkOther (ImmFlatten (rewritee_clause, [])) None in *)
+     clauses := List.append !clauses [rewritee_clause]
   );
-  link_link_of_clauses !clauses;
   List.hd !clauses
 
 
@@ -292,7 +295,7 @@ let rec visit_formula_proof = function
   (* | Tautology (f, _) -> visit_formula f *)
   | Asserted (f) ->
     (* Printf.printf ("\n hey Asserted ------------------ \n"); *)
-    pp_form (Form.pform f);
+    (* pp_form (Form.pform f); *)
     mkRootV [f]
   | Equality (fp, ep) ->
     let fproof_clause = visit_formula_proof fp in
@@ -301,20 +304,25 @@ let rec visit_formula_proof = function
     let ep_cl = visit_equality_proof ep fproof_clause in
     let first_cl = get_first ep_cl in
     let last_cl = get_last ep_cl in
-    (if (is_simplification_rewrite ep)
-     then (
-       (* let res = mkRes last_cl fproof_clause [] in *)
-       (* link fproof_clause first_cl; *)
+    (match ep with
+     | Rewrite (_, Rewrite_notSimp) ->
        link fproof_clause last_cl;
-       last_cl)
-     else
+       last_cl
+     | Rewrite(_, Rewrite_intern) ->
+       link fproof_clause last_cl;
+       last_cl
+     | Rewrite(_, _) ->
        let (a,b,c) = get_whole_and_sub_formulas ep in
-       let ib1 = mkOther (ImmBuildDef2 last_cl) (Some [Form.neg b;c]) in
+       (* let ib1 = mkOther (ImmBuildDef2 last_cl) (Some [Form.neg b;c]) in *)
+       let ib1 = mkOther (ImmBuildDef2 last_cl) None in
        let res1 = mkRes ib1 fproof_clause [] in
        link fproof_clause first_cl;
        link last_cl ib1;
        link ib1 res1;
-       res1)
+       res1
+     | Congruence (_, _) ->
+       fproof_clause
+    )
   | Split (fp, f, rule) ->
     let unsplit_clause = visit_formula_proof fp in
     translate_split unsplit_clause rule
@@ -327,28 +335,84 @@ let rec hack_replace_level1_by_op f op =
   (* | Fatom formu -> hack_replace_level1_by_op formu op *)
   | Fapp (fo, _) ->
     negate_formula (Fapp (fo, Array.of_list [op; op]))
+let do_args_appear_in_eq eq a b =
+  begin match eq with
+    | Abop (_, x, y) when x == a && y == b->
+      (* print_string "\n finds true1"; *)
+      true
+    | Abop (_, y, x) when x == a && y == b->
+      (* print_string "\n finds true2"; *)
+      true
+    | _ ->
+      (* print_string "\n finds false"; *)
+      false end
+let pair_to_option a b ns =
+  begin let finds = List.find_all (fun fatom ->
+      (* pp_form (Form.pform fatom);
+       * print_string "\npait_to_option";
+       * Atom.to_smt Format.std_formatter a;
+       * Atom.to_smt Format.std_formatter b; *)
+      let Fatom atom = Form.pform fatom in
+      let aatom = Atom.atom atom in
+      do_args_appear_in_eq aatom a b) ns in
+    match finds with
+    | [nf] ->
+      print_string "\nfinds Some";
+      Some nf
+    | _ ->
+      print_string "\nfinds None";
+      None end 
 
-(* let handle_lemma = function
- *   | L_CC_Congruence (f, ns)->
- *     (\* let ra = VeritSyntax.ra in
- *      * let rf = VeritSyntax.rf in
- *      * let fakestring = "(= (f z x) (f z y)) (not (= x y)) (not (= z z))" in
- *      * let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
- *      * let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in *\)
- *     print_string "\n----- handle_lemma: returned root!";
- *     let (Fatom subform1) = Form.pform (get_subformula f 0) in
- *     let reif = Atom.create () in
- *     let subatom1 = get_first_subatom (Atom.atom subform1) in
- *     (\* let op2 = get_first_subatom subatom1 () in *\)
- *     Atom.to_smt Format.std_formatter subatom1 ;
- *     (\* let subform2 = get_subformula f 9 in
- *      * let changed = hack_replace_level1_by_op subform2 op2 in
- *      * let newns = changed :: ns in *\)
- *     pp_form (Form.pform f);
- *     pp_form (Form.pform f);
- *     pp_form (Form.pform f);
- *     (\* mkOther (EqCgr (f, List.map (fun x -> Some x) newns)) None *\)
- *     mkOther (EqCgr (f, List.map (fun x -> Some x) ns)) None *)
+let generate_subpath_from_arg f (raw_ns: SmtAtom.Form.t list) =
+  let ns = raw_ns in
+  let f_pos = Form.pform f in
+  let Fatom (raw_atom) = f_pos in
+  (* let hatom = Atom.get VeritSyntax.ra raw_atom in *)
+  (* Atom.to_smt Format.std_formatter raw_atom; *)
+  let Abop(_, l, r) = Atom.atom raw_atom in
+  let Aapp (_, lhs) = Atom.atom l in
+  (* Array.iter (fun x -> Atom.to_smt Format.std_formatter x) lhs; *)
+  let Aapp (_, rhs) = Atom.atom r in
+  (* Array.iter (fun x -> Atom.to_smt Format.std_formatter x) rhs; *)
+  (* print_string ("\nfinds " ^ (string_of_int (Array.length lhs))); *)
+  Array.map2 (fun x y -> pair_to_option x y ns) lhs rhs 
+
+let get_fun_args f =
+  match f with
+  | Fapp (_, far) -> Array.to_list far
+
+
+let handle_lemma = function
+  | L_CC_Congruence (f, ns)->
+    (* let ra = VeritSyntax.ra in
+     * let rf = VeritSyntax.rf in
+     * let fakestring = "(= (f z x) (f z y)) (not (= x y)) (not (= z z))" in
+     * let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
+     * let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in *)
+    (* print_string "\n----- handle_lemma: returned root!";
+     * let (Fatom subform1) = Form.pform (get_subformula f 0) in
+     * let reif = Atom.create () in
+     * let subatom1 = get_first_subatom (Atom.atom subform1) in *)
+    (* let op2 = get_first_subatom subatom1 () in *)
+    (* Atom.to_smt Format.std_formatter subatom1 ; *)
+    (* let subform2 = get_subformula f 9 in
+     * let changed = hack_replace_level1_by_op subform2 op2 in
+     * let newns = changed :: ns in *)
+    (* mkOther (EqCgr (f, List.map (fun x -> Some x) newns)) None *)
+    (* mkOther (EqCgr (f, List.map (fun x -> Some x) ns)) None *)
+    (* mkRootV [f] *)
+    (* let fun_args = get_fun_args (Form.pform f) in
+     * let nfs = List.map (fun raw -> generate_subpath_from_arg raw ns) fun_args in  *)
+    let nfs = generate_subpath_from_arg f ns in
+    let nfs = Array.to_list nfs in
+    List.iter (fun x ->
+        match x with
+        | Some v ->
+          pp_form (Form.pform v)
+        | None -> print_string "Nothing") nfs;
+    print_string ("\nhandle_lemma length: " ^ (string_of_int (List.length nfs)));
+    mkOther (EqCgr (f, nfs)) None
+      (* mkOther (EqCgr (f, [])) None *)
 
 let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t SmtCertif.clause =
   print_string "\npt_to_smtcoq: visit_clause_proof: Begin";
@@ -364,4 +428,4 @@ let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t Sm
   | Clause (fp, f) ->
     print_string "\n----- handle_clause: will return root!";
     visit_formula_proof fp
-  (* | Lemma l -> handle_lemma l *)
+  | Lemma l -> handle_lemma l
