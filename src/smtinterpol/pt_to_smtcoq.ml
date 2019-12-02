@@ -8,6 +8,12 @@ open VeritSyntax
 
 exception ProofrulesToSMTCoqExpection of string
 
+let clause_table : (Prooftree_ast.clause_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let equality_table : (Prooftree_ast.equality_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let formula_table : (Prooftree_ast.formula_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+
+
+
 let isSome option =
   match option with
   | None -> false
@@ -73,6 +79,9 @@ let rec get_last c =
   | Some n -> get_last n
   | None -> c
 
+let smart_link c1 c2 =
+  link (get_last c1) (get_first c2)
+
 (* Assumption: The first clause of the certificate is given. *)
 let move_roots_to_beginning c =
 
@@ -137,44 +146,20 @@ let get_subformula f i =
   | Fapp (_, ar) -> Array.get ar i
   | Fatom form -> f
 
-let get_first_subatom a i =
-  let rif = Atom.create () in
-  Atom.to_smt Format.std_formatter (Atom.get rif a) 
-  (* let atom = a in
-   * match atom with
-   * | Abop (_, a1, a2) -> a1 *)
-
-(* | Reflexivity (f) -> visit_formula f *)
-(* | Transitivity (ep1, ep2) ->
- *   let cl1 = visit_equality_proof ep1 in
- *   let cl2 = visit_equality_proof ep2 in
- *   mkRes cl1 cl2 [] *)
-(* | Congruence (ep1, ep2) ->
- *   (\* visit_equality_proof ep1;
- *    * visit_equality_proof ep2 *\)
- *     mkRoot *)
-
-(* (iff x y) => (not (xor x y)) *)
-
-(* let tailref = ref [] *)
 
 let negate_formula f =
   let reif = Form.create () in
   let formula = Form.get reif f in 
   SmtAtom.Form.neg (formula)
 
-let replace_fop_and_negate f =
-  match f with
-  | Fapp (Fiff, ar) ->
-    let dings = Fapp (Fxor, ar) in
-    negate_formula dings
+let mkResV c1 c2 tl v =
+  mk_scertif (Res { rc1 = c1; rc2 = c2; rtail = tl }) v
 
 let link_link_of_clauses ls =
   match ls with
   | [] -> ()
   | h :: tl -> let _ = List.fold_left (fun l r -> link l r; r) h tl in ()
 
-let mkSame r ov = mk_scertif (Same r) ov
 
 let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
   let lhs = get_subformula rewrite_formula 0 in
@@ -206,26 +191,12 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
      (* Resolve to (iff a b) (not x) *)
      let res_nx = mkRes res_x_ny res_nx_ny [] in
 
-     let res = mkRes res_x res_nx [] in
+     let res = mkResV res_x res_nx [] (Some [rewrite_formula]) in
 
      clauses := List.append !clauses [base_pos; base_neg; choose_nx_y_1; choose_nx_y_2; res_nx_y; choose_x_y_1; choose_x_y_2; res_x_y; res_x; choose_x_ny_1; choose_x_ny_2; res_x_ny; choose_nx_ny_1; choose_nx_ny_2; res_nx_ny; res_nx; res];
-         link_link_of_clauses !clauses;
-     (* Resolve to (iff a b) (not x) y *)
-     (* Resolve to (iff a b) (not x) y *)
-
-
-
-
-
-    (* (\* TODO: Das hier ist nur über IMplication, muss aber in beide Richtungen und damit unabhängig von rewritee_clause funktioniertn -> ImmBuildDefs nur benutzbar bei lokalen Clausen, falls überhaupt notwendig  *\)
-     * let bd1 = mkOther (BuildDef rhs) None in
-     * let bd2 = mkOther (BuildDef2 rhs) None in
-     * let id1 = mkOther (ImmBuildDef rewritee_clause) None in 
-     * let id2 = mkOther (ImmBuildDef2 rewritee_clause) None in
-     * let res1 = mkRes bd1 id1 [] in
-     * let res2 = mkRes bd2 id2 [res1] in
-     * clauses := List.append !clauses [bd1; bd2; id1; id2; res1; res2;] *)
-    (* res2 *)
+     print_string "\n ** Begin linking rewr clauses eqtoor";
+     link_link_of_clauses !clauses;
+     print_string "\n ** End linking rewr clauses eqtoor";
    | Rewrite_andToOr ->
      let base_1 = mkOther (BuildDef2 rewrite_formula) None in
      (* Resolve to (iff a b) x *)
@@ -242,17 +213,20 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
      let sum_or = mkOther (BuildDef rhs) None in
      let res_nx_ny = mkRes base2 sum_and [sum_or] in
      (* Resolve to (iff a b) *)
-     let res = mkRes res_nx_ny res_x [res_y] in
+     let res = mkResV res_nx_ny res_x [res_y] (Some [rewrite_formula]) in
      clauses := List.append !clauses [base_1; prod_and_1; prod_or_1; res_x; prod_and_2; prod_or_2; res_y; base2; sum_and; sum_or; res_nx_ny; res];
-         link_link_of_clauses !clauses;
+     print_string "\n ** Begin linking rewr clauses andtoor";
+     link_link_of_clauses !clauses;
+     print_string "\n ** End linking rewr clauses andtoor";
    | Rewrite_notSimp ->
-     let simpl1 = mkOther (ImmFlatten (rewritee_clause, rhs)) None in
+     let simpl1 = mkOther (ImmFlatten (rewritee_clause, rhs)) (Some [rhs]) in
      clauses := List.append !clauses [simpl1];
          link_link_of_clauses !clauses;
    | Rewrite_intern ->
      (* let refl = mkOther (ImmFlatten (rewritee_clause, [])) None in *)
      clauses := List.append !clauses [rewritee_clause]
   );
+  print_string "\n * List.hd !clauses";
   List.hd !clauses
 
 
@@ -264,20 +238,90 @@ let translate_split unsplit_clause split_rule =
   match split_rule with
   | Split_xor_2 -> 
     let split_clause = mkOther (ImmBuildDef2 unsplit_clause) None in
+    print_string "\n--- Split xor2 begin!";
     link unsplit_clause split_clause;
+    print_string "\n--- Split xor2 end!";
     split_clause
   | Split_notOr ->
     (*  TODO: remove hardcoded index... need to detect correct index instead *)
     let split_clause = mkOther (ImmBuildProj (unsplit_clause, 1)) None in
+    print_string "\n--- Split notor begin!";
     link unsplit_clause split_clause;
+    print_string "\n--- Split notor end!";
     split_clause
 
+let substitute_sub_formula f a b =
+  match f with
+  | Fapp (fop, far) ->
+    Fapp (fop, Array.map (fun orig -> if (Form.equal orig a) then b else orig) far)
 
+let mkEquality f g =
+  let form_pos = Fapp (Fiff, Array.of_list [f; g]) in
+  Form.get VeritSyntax.rf form_pos
+    
 let rec visit_equality_proof ep existsclause =
-  match ep with
+  if Hashtbl.mem equality_table ep then Hashtbl.find equality_table ep else
+    let new_clause = 
+    (match ep with
   | Rewrite (formula, rule) -> translate_rewrite existsclause rule formula
-  | Congruence (lep, rep) -> visit_equality_proof lep existsclause
-  | Reflexivity formula -> mkRootV [formula]
+  | Congruence (lep, Rewrite (_, Rewrite_intern)) -> visit_equality_proof lep existsclause
+  (* | Congruence (lep, rep) -> assert false; visit_equality_proof lep existsclause *)
+  | Congruence (lep, rep) ->
+    print_string "\n--- We are in congruence!";
+    let lecl = visit_equality_proof lep existsclause in
+    let recl = visit_equality_proof rep existsclause in
+    print_string "\n--- We are still in congruence!";
+    (* print_string ("equalityproof: " ^ (string_of_int lecl.id)); *)
+    (* print_certif Form.to_smt Atom.to_smt recl ".certoutputep"; *)
+    let (Some [le_formula]) = (get_last lecl).value in
+    let (Some [re_formula]) = (get_last recl).value in
+    let f = get_subformula le_formula 0 in
+    let (g : SmtAtom.Form.t) = get_subformula le_formula 1 in
+    let (a : SmtAtom.Form.t) = get_subformula re_formula 0 in
+    let (b : SmtAtom.Form.t) = get_subformula re_formula 1 in
+    let negated_equality = Form.neg re_formula in
+    let negated_equality_pos = Form.pform negated_equality in
+    let negated_equality_trans = mkOther (EqTr (negated_equality, [])) None in
+    let substituted_function_pos = substitute_sub_formula (Form.pform g) a b in
+    let substituted_function = Form.get VeritSyntax.rf substituted_function_pos in
+    let substituted_equality = Fapp (Fiff, Array.of_list [f; substituted_function]) in
+    let substituted_equality_t = Form.get VeritSyntax.rf substituted_equality in
+    let cong = mkOther (EqCgr (substituted_equality_t, [(Some negated_equality)])) (Some [substituted_equality_t]) in
+    let res = mkResV cong negated_equality_trans [] (Some [substituted_equality_t]) in
+    print_certif Form.to_smt Atom.to_smt res ".certoutputep";
+    print_string "\n ** nearly end of cong";
+    link recl cong;
+    link cong negated_equality_trans;
+    link negated_equality_trans res;
+    print_string "\n ** end of cong";
+    recl
+  | Transitivity (lep, rep) ->
+    print_string "--- We are in transitivity!";
+    let lecl = visit_equality_proof lep existsclause in
+    let recl = visit_equality_proof rep existsclause in
+    let (Some le_formula_o) = (get_last lecl).value in
+    let (Some re_formula_o) = (get_last recl).value in
+    let le_formula = List.hd le_formula_o in
+    let re_formula = List.hd re_formula_o in
+    let a = get_subformula le_formula 0 in
+    let (b : SmtAtom.Form.t) = get_subformula le_formula 1 in
+    let (c : SmtAtom.Form.t) = get_subformula re_formula 1 in
+    let eq_to_show = mkEquality a c in
+    let first_neg = Form.neg (mkEquality a b) in
+    let second_neg = Form.neg (mkEquality b c) in
+    let first_neg_clause = mkOther (EqTr (first_neg, [])) None in
+    let second_neg_clause = mkOther (EqTr (second_neg, [])) None in
+    let trans = mkOther (EqTr (eq_to_show, [first_neg; second_neg])) None  in
+    let res = mkResV trans first_neg_clause [second_neg_clause] (Some [eq_to_show]) in
+    link lecl recl;
+    link recl trans;
+    link trans res;
+    lecl
+  | Reflexivity formula ->
+    let refl_formula = mkEquality formula formula in
+    mkOther (EqTr (formula, [])) (Some [refl_formula])) in
+    Hashtbl.add equality_table ep new_clause;
+    new_clause
 
 let is_simplification_rewrite pr =
   match pr with
@@ -291,8 +335,11 @@ let get_whole_and_sub_formulas rewrite_proof_rule =
     let rhs = get_subformula r_formula 1 in
     (r_formula, lhs, rhs)
 
-let rec visit_formula_proof = function
-  (* | Tautology (f, _) -> visit_formula f *)
+let rec visit_formula_proof form =
+  if Hashtbl.mem formula_table form then Hashtbl.find formula_table form else
+    let new_clause =
+      (match form with
+      (* | Tautology (f, _) -> visit_formula f *)
   | Asserted (f) ->
     (* Printf.printf ("\n hey Asserted ------------------ \n"); *)
     (* pp_form (Form.pform f); *)
@@ -306,26 +353,38 @@ let rec visit_formula_proof = function
     let last_cl = get_last ep_cl in
     (match ep with
      | Rewrite (_, Rewrite_notSimp) ->
+       print_string "\n ** begin of in equality notSimpl";
        link fproof_clause last_cl;
        last_cl
      | Rewrite(_, Rewrite_intern) ->
-       link fproof_clause last_cl;
+       (* link fproof_clause last_cl; *)
        last_cl
      | Rewrite(_, _) ->
        let (a,b,c) = get_whole_and_sub_formulas ep in
        (* let ib1 = mkOther (ImmBuildDef2 last_cl) (Some [Form.neg b;c]) in *)
        let ib1 = mkOther (ImmBuildDef2 last_cl) None in
-       let res1 = mkRes ib1 fproof_clause [] in
+       let res1 = mkResV ib1 fproof_clause [] (Some [a]) in
+       print_string "\n ** begin of in equality rewr";
        link fproof_clause first_cl;
        link last_cl ib1;
        link ib1 res1;
+       print_string "\n ** end of in equality rewr";
        res1
      | Congruence (_, _) ->
-       fproof_clause
+       let ib1 = mkOther (ImmBuildDef2 last_cl) None in
+       let res1 = mkResV ib1 fproof_clause [] None in
+       print_string "\n ** begin of in equality cong";
+       link fproof_clause first_cl;
+       link last_cl ib1;
+       link ib1 res1;
+       print_string "\n ** end of in equality cong";
+       res1
     )
   | Split (fp, f, rule) ->
     let unsplit_clause = visit_formula_proof fp in
-    translate_split unsplit_clause rule
+    translate_split unsplit_clause rule) in
+    Hashtbl.add formula_table form new_clause;
+    new_clause
 (* let hack_replace_atom_op a op = *)
 
 
@@ -377,55 +436,33 @@ let generate_subpath_from_arg f (raw_ns: SmtAtom.Form.t list) =
   (* print_string ("\nfinds " ^ (string_of_int (Array.length lhs))); *)
   Array.map2 (fun x y -> pair_to_option x y ns) lhs rhs 
 
-let get_fun_args f =
-  match f with
-  | Fapp (_, far) -> Array.to_list far
 
-
+(* TODO Add transitivity *)
 let handle_lemma = function
   | L_CC_Congruence (f, ns)->
-    (* let ra = VeritSyntax.ra in
-     * let rf = VeritSyntax.rf in
-     * let fakestring = "(= (f z x) (f z y)) (not (= x y)) (not (= z z))" in
-     * let faketerm = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string fakestring) in
-     * let fakeform = Smtlib2_genConstr.make_root ra rf faketerm in *)
-    (* print_string "\n----- handle_lemma: returned root!";
-     * let (Fatom subform1) = Form.pform (get_subformula f 0) in
-     * let reif = Atom.create () in
-     * let subatom1 = get_first_subatom (Atom.atom subform1) in *)
-    (* let op2 = get_first_subatom subatom1 () in *)
-    (* Atom.to_smt Format.std_formatter subatom1 ; *)
-    (* let subform2 = get_subformula f 9 in
-     * let changed = hack_replace_level1_by_op subform2 op2 in
-     * let newns = changed :: ns in *)
-    (* mkOther (EqCgr (f, List.map (fun x -> Some x) newns)) None *)
-    (* mkOther (EqCgr (f, List.map (fun x -> Some x) ns)) None *)
-    (* mkRootV [f] *)
-    (* let fun_args = get_fun_args (Form.pform f) in
-     * let nfs = List.map (fun raw -> generate_subpath_from_arg raw ns) fun_args in  *)
     let nfs = generate_subpath_from_arg f ns in
     let nfs = Array.to_list nfs in
-    List.iter (fun x ->
-        match x with
-        | Some v ->
-          pp_form (Form.pform v)
-        | None -> print_string "Nothing") nfs;
-    print_string ("\nhandle_lemma length: " ^ (string_of_int (List.length nfs)));
     mkOther (EqCgr (f, nfs)) None
-      (* mkOther (EqCgr (f, [])) None *)
 
 let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t SmtCertif.clause =
-  print_string "\npt_to_smtcoq: visit_clause_proof: Begin";
-  match f with
-  | Resolution (cp1, cp2) ->
-    print_string "\n---- RESO!";
-    let (cl1 : SmtAtom.Form.t SmtCertif.clause) = visit_clause_proof cp1 in
-    let cl2 = visit_clause_proof cp2 in
-    let res = mkRes cl1 cl2 [] in
-    link cl1 cl2;
-    link cl2 res;
-    res
-  | Clause (fp, f) ->
-    print_string "\n----- handle_clause: will return root!";
-    visit_formula_proof fp
-  | Lemma l -> handle_lemma l
+  (* print_string "\npt_to_smtcoq: visit_clause_proof: Begin"; *)
+  if Hashtbl.mem clause_table f then Hashtbl.find clause_table f else
+    let new_clause =
+      (match f with
+       | Resolution (cp1, cp2) ->
+         (* print_string "\n---- RESO!"; *)
+         let (cl1 : SmtAtom.Form.t SmtCertif.clause) = visit_clause_proof cp1 in
+         let cl2 = visit_clause_proof cp2 in
+         let res = mkRes cl1 cl2 [] in
+         print_string "\n begin link res";
+         print_certif Form.to_smt Atom.to_smt cl1 ".certoutputep";
+         link cl1 cl2;
+         link cl2 res;
+         print_string "\n end link res";
+         res
+       | Clause (fp, f) ->
+         (* print_string "\n----- handle_clause: will return root!"; *)
+         visit_formula_proof fp
+       | Lemma l -> handle_lemma l) in
+    Hashtbl.add clause_table f new_clause;
+    new_clause

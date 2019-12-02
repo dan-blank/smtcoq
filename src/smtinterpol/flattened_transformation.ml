@@ -101,9 +101,9 @@ and translate_eproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_a
     (* print_term Format.std_formatter annotation; *)
     let f = translate_annotated_formula_term g None in
     (* let g = translate_annotated_formula_term goal None in *)
-    print_string "\n FT: AFTER f";
+    (* print_string "\n FT: AFTER f"; *)
     let a = translate_rewrite_annotation (string_of_single_atttribute rewrite_annotation) in
-    print_string "\n FT: AFTER a";
+    (* print_string "\n FT: AFTER a"; *)
     (* let reif = Form.create () in
      * let new_form = Form.get reif (Fapp (For, Array.of_list [g ; f])) in
      * Form.to_smt Atom.to_smt Format.std_formatter new_form; *)
@@ -112,6 +112,10 @@ and translate_eproof_term termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_a
     let ep1 = translate_annotated_eproof_term ep1_term None in
     let ep2 = translate_annotated_eproof_term ep2_term None in
     Congruence (ep1, ep2)
+  | "@trans", [ep1_term; ep2_term] ->
+    let ep1 = translate_annotated_eproof_term ep1_term None in
+    let ep2 = translate_annotated_eproof_term ep2_term None in
+    Transitivity (ep1, ep2)
   | "@refl", [formula_term] ->
     let formula = translate_annotated_formula_term formula_term None in
     Reflexivity formula
