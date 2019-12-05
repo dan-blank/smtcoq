@@ -131,7 +131,7 @@ zchaff/zchaffParser.mli
 smtinterpol/modified_smtlib2_printing.ml
 smtinterpol/smtinterpol.ml
 smtinterpol/prooftree_ast.ml
-smtinterpol/flattened_transformation.ml
+smtinterpol/smtlib_to_proofrules.ml
 smtinterpol/pt_to_smtcoq.ml
 smtinterpol/tabulation.ml
 smtinterpol/smtinterpolParser.ml

@@ -10,7 +10,7 @@ open Format
 open Tabulation
 open Smtlib2_ast
 open Modified_smtlib2_printing
-open Flattened_transformation
+open Smtlib_to_proofrules
 open Pt_to_smtcoq
 
 
@@ -37,18 +37,20 @@ let import_trace ra' rf' fsmt fproof =
        printf " -> ";
        print_term Format.std_formatter y)
     term_table;
-  let prooftree = translate_annotated_clause_proof_term (Hashtbl.find term_table ".mainproof" ) None in
+  let prooftree = from_annotated_clause_proof (Hashtbl.find term_table ".mainproof" ) None in
 
   Printf.printf "\nConverted To proofrules\n";
 
 
   Printf.printf "\n --- to SMTCoq: raw\n";
   let certif = visit_clause_proof prooftree in
+  link_list_of_clauses !clauses;
   let certif = get_first certif in
-  print_certif Form.to_smt Atom.to_smt certif ".certoutput41";
 
+  print_certif Form.to_smt Atom.to_smt certif ".certoutput40";
   Printf.printf "\n --- to SMTCoq: move roots to beginning\n";
   move_roots_to_beginning certif;
+  print_certif Form.to_smt Atom.to_smt certif ".certoutput41";
   (* print_certif_by_id certif; *)
   (* assert false; *)
 
@@ -66,8 +68,7 @@ let import_trace ra' rf' fsmt fproof =
   
   Printf.printf "\n --- to SMTCoq: alloc\n";
   let max_id = SmtTrace.alloc (get_first certif) in
-  
-  Printf.printf "\n --- to SMTCoq: adjust root positions\n";
+  Atom.print_atoms VeritSyntax.ra ".atoms_output_smtinterpol"; 
   print_certif Form.to_smt Atom.to_smt certif ".certoutput42";
   (max_id, certif)
 
