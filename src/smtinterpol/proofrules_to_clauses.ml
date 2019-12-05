@@ -37,14 +37,13 @@ let remove_clause (c : 'a) : unit =
      let Some rc = rco in
      link lc rc)
   
-let move_before_clause move_clause until_clause =
-  (* print_string "pt_to_smtcoq: move_before_clause BEGIN"; *)
+let move_before_clause move_clause target_clause =
   remove_clause move_clause;
-  let prev_until_clause_o = until_clause.prev in
-  (if isSome prev_until_clause_o then
-     let Some prev_until_clause = prev_until_clause_o in
-     link prev_until_clause move_clause);
-  link move_clause until_clause
+  (** If target_clause is not the head, then link its preceeding clause to move_clause. *)
+  (match target_clause.prev with
+   | Some before_target_clause -> link before_target_clause move_clause
+   | _ -> ());
+  link move_clause target_clause
 
 let rec find_first_non_root c =
   if (not (isRoot c.kind))

@@ -18,12 +18,8 @@ let string_of_symbol = function
 let get_corresponding_term_default symbol default =
   let result = Hashtbl.find_all term_table (string_of_symbol symbol) in
   match result with
-   | [t] ->
-     print_string Format.std_formatter "\n HIT!";
-     t
-   | [] ->
-     print_string Format.std_formatter "\n MISS!";
-     default
+   | [t] -> t
+   | [] -> default
 
 let fresh_attribute_symbol_string () =
   let attribute_counter_string = string_of_int !attribute_counter in

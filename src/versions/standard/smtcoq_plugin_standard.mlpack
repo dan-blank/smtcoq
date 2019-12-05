@@ -58,7 +58,7 @@ Modified_smtlib2_printing
 Tabulation
 Prooftree_ast
 Smtlib_to_proofrules
-Pt_to_smtcoq
+Proofrules_to_clauses
 Smtinterpol
 
 

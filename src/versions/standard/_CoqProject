@@ -132,7 +132,7 @@ smtinterpol/modified_smtlib2_printing.ml
 smtinterpol/smtinterpol.ml
 smtinterpol/prooftree_ast.ml
 smtinterpol/smtlib_to_proofrules.ml
-smtinterpol/pt_to_smtcoq.ml
+smtinterpol/proofrules_to_clauses.ml
 smtinterpol/tabulation.ml
 smtinterpol/smtinterpolParser.ml
 smtinterpol/smtinterpolParser.mli
