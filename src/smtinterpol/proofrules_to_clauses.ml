@@ -13,60 +13,12 @@ let equality_table : (Prooftree_ast.equality_proof, SmtAtom.Form.t clause) Hasht
 let formula_table : (Prooftree_ast.formula_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
 
 let clauses : SmtAtom.Form.t clause list ref = ref []
+let roots : SmtAtom.Form.t clause list ref = ref []
 
 let isSome option =
   match option with
   | None -> false
   | _ -> true
-
-let remove_clause (c : 'a) : unit =
-  let lco = c.prev in
-  let rco = c.next in
-  (match rco with
-   | Some (rc) ->
-    c.next <- None;
-    rc.prev <- None
-   | _ -> assert false);
-  (match lco with
-   | Some (lc) ->
-     c.prev <- None;
-     lc.next <- None
-   | _ -> ());
-  (if isSome lco && isSome rco then
-     let Some lc = lco in
-     let Some rc = rco in
-     link lc rc)
-  
-let move_before_clause move_clause target_clause =
-  remove_clause move_clause;
-  (** If target_clause is not the head, then link its preceeding clause to move_clause. *)
-  (match target_clause.prev with
-   | Some before_target_clause -> link before_target_clause move_clause
-   | _ -> ());
-  link move_clause target_clause
-
-let rec find_first_non_root c =
-  if (not (isRoot c.kind))
-  then c
-  else
-    let Some n = c.next in
-    find_first_non_root n
-
-(* Traverse list backwards!
-we want all roots after the first non root
-*)
-let rec take_while_cert goal c acc =
-  let newacc = 
-  (match c.kind with
-  | Root -> c :: acc
-  | _ -> acc) in
-  if (eq_clause goal c)
-  then newacc
-  else
-  (match c.prev with
-  | Some n -> take_while_cert goal n newacc
-  | None -> newacc)
-
 
 let rec get_first c =
   match c.prev with
@@ -78,34 +30,11 @@ let rec get_last c =
   | Some n -> get_last n
   | None -> c
 
-(* let smart_link c1 c2 =
- *   link (get_last c1) (get_first c2) *)
-
-(* Assumption: The first clause of the certificate is given. *)
-let move_roots_to_beginning c =
-  print_string "\nmove_roots_to_beginning";
-  let first_non_root = find_first_non_root c in
-  let last_clause = get_last c in
-  let roots = take_while_cert first_non_root last_clause [] in
-  List.iter (fun root_to_move ->
-print_string ("\n ****** pt_to_smtcoq: and another root: " ^ (string_of_int root_to_move.id) ^ " is moved before: " ^ (string_of_int first_non_root.id) );
-      move_before_clause root_to_move first_non_root) roots
-
-
-let increment_root c new_pos =
-  (* print_string ("\n pt_to_smtcoq increment_root id: " ^ (string_of_int c.id) ^ " new_pos: " ^ (string_of_int new_pos)); *)
-  match c.kind with
-   | Root ->
-     c.pos <- Some new_pos;
-     (* print_string ("\n pt_to_smtcoq Middle Root! " ^ (string_of_int new_pos)) *)
-   | _ -> ()
-
-let rec reposition_roots c pos =
+let rec adjust_root_pos_values c pos =
   let new_pos = pos + 1 in
-  increment_root c new_pos;
+  if (isRoot c.kind) then c.pos <- Some (pos + 1);
   match c.next with
-  | Some n ->
-    reposition_roots n new_pos
+  | Some n -> adjust_root_pos_values n new_pos
   | None -> ()
 
 let form_op_to_string = function
@@ -143,7 +72,7 @@ let get_subformula f i =
   let formula = Form.pform f in
   match formula with
   | Fapp (_, ar) -> Array.get ar i
-  | Fatom form -> f
+  (* | Fatom form -> f *)
 
 
 let negate_formula f =
@@ -159,6 +88,10 @@ let link_list_of_clauses ls =
   | [] -> ()
   | h :: tl -> let _ = List.fold_left (fun l r -> link l r; r) h tl in ()
 
+let add_roots_and_non_roots () =
+  clauses := List.append !roots !clauses;
+  link_list_of_clauses !clauses;
+  adjust_root_pos_values (List.hd !clauses) (-1)
 
 
 let lmkOther rule value =
@@ -178,19 +111,19 @@ let lmkResV r l tl v =
 
 let lmkRootV v =
   let clause = mkRootV v in
-  clauses := List.append !clauses [clause];
+  roots := List.append !roots [clause];
+  (* clauses := List.append !clauses [clause]; *)
   clause
 
 let mkEquality f g =
   let form_pos = Fapp (Fiff, Array.of_list [f; g]) in
   Form.get VeritSyntax.rf form_pos
 
-let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
+(* Given an iff formula, return a clause that proves this formula.*)
+let translate_rewrite_iff rewritee_clause rewrite_rule rewrite_formula =
   let lhs = get_subformula rewrite_formula 0 in
   let rhs = get_subformula rewrite_formula 1 in
-  (* let clauses = ref [] in *)
-  let ret = ref rewritee_clause in
-  (match rewrite_rule with
+  match rewrite_rule with
    | Rewrite_eqToXor ->
      let base_pos = lmkOther (BuildDef2 rewrite_formula) None in
      Printf.printf "\n# translate_rewrite eqToXor first %i" base_pos.id;
@@ -218,10 +151,8 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
      let res_nx = lmkRes res_x_ny res_nx_ny [] in
 
      let res = lmkResV res_x res_nx [] (Some [rewrite_formula]) in
-
      Printf.printf "\n# translate_rewrite eqToXor last %i" res.id;
-     ret := res;
-
+     res
      (* clauses := List.append !clauses [base_pos; base_neg; choose_nx_y_1; choose_nx_y_2; res_nx_y; choose_x_y_1; choose_x_y_2; res_x_y; res_x; choose_x_ny_1; choose_x_ny_2; res_x_ny; choose_nx_ny_1; choose_nx_ny_2; res_nx_ny; res_nx; res]; *)
    | Rewrite_andToOr ->
      let base_1 = lmkOther (BuildDef2 rewrite_formula) None in
@@ -242,24 +173,27 @@ let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
      (* Resolve to (iff a b) *)
      let res = lmkResV res_nx_ny res_x [res_y] (Some [rewrite_formula]) in
      Printf.printf "\n# translate_rewrite andToOr last %i" res.id;
-     ret := res;
-     (* clauses := List.append !clauses [base_1; prod_and_1; prod_or_1; res_x; prod_and_2; prod_or_2; res_y; base2; sum_and; sum_or; res_nx_ny; res]; *)
+     res
+   (* TODO Rewrite_notSimp has to return an iff formula. *)
    | Rewrite_notSimp ->
      let simpl1 = lmkOther (ImmFlatten (rewritee_clause, rhs)) (Some [rhs]) in
      Printf.printf "\n# translate_rewrite notSimpl %i" simpl1.id;
-     ret := simpl1;
-     (* clauses := List.append !clauses [simpl1]; *)
+     simpl1
+   (* TODO Rewrite_intern has to return an iff formula. *)
    | Rewrite_intern ->
      (* let refl = lmkOther (ImmFlatten (rewritee_clause, [])) None in *)
      let Some [formula] = rewritee_clause.value in
      let refl_formula = mkEquality formula formula in
      let refl_cl = lmkOther (EqTr (refl_formula, [])) (Some [refl_formula]) in
-     ret := refl_cl;
-     (* clauses := List.append !clauses [rewritee_clause] *)
-  );
-  !ret
+     refl_cl
+  
+let translate_rewrite_equality dummy = assert false
 
-
+let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
+  let form_pos = Form.pform rewrite_formula in
+  match form_pos with
+  | Fapp (Fiff, _) -> translate_rewrite_iff rewritee_clause rewrite_rule rewrite_formula
+  | Fatom (_) -> translate_rewrite_equality rewritee_clause rewrite_rule rewrite_formula
 
     (* rewritee_clause *)
 
@@ -342,42 +276,6 @@ let rec visit_equality_proof ep existsclause =
         (Some ((t_ti_formu) :: (Array.to_list n_e))) in
     let res = lmkResV cong recl [] (Some [re_formula]) in
     res
-
-    (* print_string "\n--- We are in congruence!";
-     * let lecl = visit_equality_proof lep existsclause in
-     * Printf.printf "\n# visit_equality_proof Congruence first %i" lecl.id;
-     * let recl = visit_equality_proof rep existsclause in
-     * Printf.printf "\n# visit_equality_proof Congruence second %i" recl.id;
-     * (\* link_list_of_clauses !clauses; *\)
-     * (\* print_certif Form.to_smt Atom.to_smt (List.hd !clauses) ".cerouttillsub"; *\)
-     * (\* print_string "\n--- We are still in congruence!"; *\)
-     * (\* print_string ("equalityproof: " ^ (string_of_int lecl.id)); *\)
-     * (\* print_certif Form.to_smt Atom.to_smt recl ".certoutputep"; *\)
-     * let (Some [le_formula]) = (get_last lecl).value in
-     * let (Some [re_formula]) = (get_last recl).value in
-     * let f = get_subformula le_formula 0 in
-     * print_string "\n f";
-     * pp_form (Form.pform f);
-     * let (g : SmtAtom.Form.t) = get_subformula le_formula 1 in
-     * print_string "\n g";
-     * pp_form (Form.pform g);
-     * let (a : SmtAtom.Form.t) = get_subformula re_formula 0 in
-     * print_string "\n a";
-     * pp_form (Form.pform a);
-     * let (b : SmtAtom.Form.t) = get_subformula re_formula 1 in
-     * print_string "\n b";
-     * pp_form (Form.pform b);
-     * let negated_equality = Form.neg re_formula in
-     * let negated_equality_pos = Form.pform negated_equality in
-     * let substituted_function = substitute_sub_formula (Form.pform g) a b in
-     * let substituted_equality = Fapp (Fiff, Array.of_list [f; Form.neg substituted_function]) in
-     * let substituted_equality_t = Form.get VeritSyntax.rf substituted_equality in
-     * let cong = lmkOther (EqCgr (substituted_equality_t, [(Some negated_equality)])) (Some [substituted_equality_t; negated_equality]) in
-     * let res = lmkResV cong recl [] (Some [substituted_equality_t]) in
-     * (\* print_certif Form.to_smt Atom.to_smt res ".certoutputep"; *\)
-     * (\* print_string "\n ** end of cong"; *\)
-     * Printf.printf "\n# visit_equality_proof Congruence last %i" res.id;
-     * res *)
   | Transitivity (lep, rep) ->
     let lecl = visit_equality_proof lep existsclause in
     Printf.printf "\n# visit_equality_proof Transitivity first %i" lecl.id;
