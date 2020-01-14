@@ -1,6 +1,8 @@
 open Smtlib2_ast
 open Prooftree_ast
 open Tabulation
+open Proofrules_to_clauses
+open SmtAtom
 
 let string_of_single_atttribute = function
   | (_, [AttributeKeyword (_, s)]) -> s
@@ -21,7 +23,10 @@ let from_annotated_formula term annotation =
   | t ->
     let ra = VeritSyntax.ra in
     let rf = VeritSyntax.rf in
-    Smtlib2_genConstr.make_root ra rf t
+    let r = Smtlib2_genConstr.make_root ra rf t in
+    Printf.printf "\n ";
+    Form.to_smt Atom.to_smt Format.std_formatter r;
+    r
 
 
 let rec from_annotated_eproof term (closest_annotation: (Smtlib2_ast.loc * Smtlib2_ast.attribute list) option) =
@@ -35,17 +40,18 @@ and from_eproof termcontext (annotation : (Smtlib2_ast.loc * Smtlib2_ast.attribu
   let (str,_) = termcontext in
   match termcontext with
   | "@rewrite", [TermExclimationPt (_, g, rewrite_annotation)] ->
+    Printf.printf "Rewrite Formula";
     let f = from_annotated_formula g None in
+    Printf.printf "\n rewrite formula";
+    Form.to_smt Atom.to_smt Format.std_formatter f;
     let a = from_rewrite_annotation (string_of_single_atttribute rewrite_annotation) in
     Rewrite (f, a)
-  | "@cong", [ep1_term; ep2_term] ->
-    let ep1 = from_annotated_eproof ep1_term None in
-    let ep2 = from_annotated_eproof ep2_term None in
-    Congruence (ep1, ep2)
-  | "@trans", [ep1_term; ep2_term] ->
-    let ep1 = from_annotated_eproof ep1_term None in
-    let ep2 = from_annotated_eproof ep2_term None in
-    Transitivity (ep1, ep2)
+  | "@cong", equality_proof_terms ->
+    let h :: es = List.map (fun ep -> from_annotated_eproof ep None) equality_proof_terms in
+    List.fold_left (fun acc el -> Congruence (acc, el)) h es
+  | "@trans", equality_proof_terms ->
+    let h :: es = List.map (fun ep -> from_annotated_eproof ep None) equality_proof_terms in
+    List.fold_left (fun acc el -> Transitivity (acc, el)) h es
   | "@refl", [formula_term] ->
     let formula = from_annotated_formula formula_term None in
     Reflexivity formula
