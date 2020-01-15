@@ -3,6 +3,7 @@ open SmtCertif
 open Tabulation
 open Smtlib_to_proofrules
 open Proofrules_to_clauses
+open Smtlib2_ast
 
 
 
@@ -16,7 +17,11 @@ let import_trace fsmt fproof =
   tabulate_proof proof_term;
 
   Printf.printf "\n Translating smtlib terms to proofrules ...";
-  let prooftree = from_annotated_clause_proof (Hashtbl.find term_table ".mainproof" ) None in
+  let xy = Hashtbl.find term_table ".mainproof" in
+  let TermQualIdTerm (_, i, (_, tl)) = xy in
+  Printf.printf "\n* %s %i" (string_of_qualidentifier i) (List.length tl);
+  print_term Format.std_formatter xy;
+  let prooftree = from_clause_proof (string_of_qualidentifier i) tl in
 
   Printf.printf "\n Translating proofrules to clauses ...";
   let certif_after_translation = visit_clause_proof prooftree in
