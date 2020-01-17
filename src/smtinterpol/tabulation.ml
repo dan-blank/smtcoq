@@ -69,6 +69,10 @@ let flatten_attribute_keyword_value_sexpr = function
     let tabulated_annotated_term = transform_sexpr_to_term_and_return_symbol at in
     let tabulated_sexpr_list = transform_sexpr_list sl in
     AttributeValSexpr (l1, (l2, tabulated_annotated_term  :: a :: tabulated_sexpr_list))
+  | ":pivot", AttributeValSexpr (l1, (l2, _ :: t :: _)) ->
+    let tabulated_annotated_term = transform_sexpr_to_term_and_return_symbol t in
+    AttributeValSexpr (l1, (l2, [tabulated_annotated_term]))
+  | s, _ -> Printf.printf "\nFailing at: %s" s; assert false
 
 (******************************************************************************)
 (* Tabulate functions that visit values defined in SmtLib2_ast.                *)
