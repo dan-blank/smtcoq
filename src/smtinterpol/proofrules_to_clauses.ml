@@ -148,6 +148,35 @@ let mkEquality f g =
   let form_pos = Fapp (Fiff, Array.of_list [f; g]) in
   Form.get VeritSyntax.rf form_pos
 
+let isTrueFop fapp =
+  match fapp with
+  | Fapp (Ftrue, _) ->
+    (* assert false; *)
+    true
+  | _ -> false
+
+let isTrueEqIntern f =
+  let r_sub = Form.pform (get_subformula f 1) in
+  match r_sub with
+  | Fapp (Fiff, far) ->
+    let pot_true = Array.get far 1 in
+    isTrueFop (Form.pform pot_true)
+  | _ -> false
+
+(* TODO consider symmetric case*)
+let create_intern_true_eq (iixt : SmtAtom.Form.t) =
+  deb "create_intern_true_eq BEG";
+  let ixt = get_subformula iixt 1 in
+  let iixt_x_nixt = aux_bd2 iixt in
+  let ixt_nx_false = aux_bd1 ixt in
+  let iixt_ixt = lmkRes iixt_x_nixt ixt_nx_false [] in
+  let iixt_nx_nixt = aux_bd1 iixt in
+  let nixt_x_false = aux_bd1 (Form.neg ixt) in
+  let iixt_nixt = lmkRes iixt_nx_nixt nixt_x_false [] in
+  let iixt = lmkResV iixt_ixt iixt_nixt [] (Some [iixt]) in
+  deb "create_intern_true_eq END";
+  iixt
+
 (* Given a boolean equality, return a clause that proves it.*)
 let handle_rewrite_bool rewritee_clause rewrite_rule rewrite_formula =
   (* let lhs_raw = get_subformula_raw rewrite_formula 0 in *)
@@ -215,13 +244,16 @@ let handle_rewrite_bool rewritee_clause rewrite_rule rewrite_formula =
      simpl1
    (* TODO Rewrite_intern has to return an iff formula. *)
    | Rewrite_intern ->
+     if (isTrueEqIntern rewrite_formula)
+     then (create_intern_true_eq rewrite_formula) 
+     else (
      let formula_l = get_subformula rewrite_formula 0 in
      let formula_r = get_subformula rewrite_formula 1 in
      let refl_formula = mkEquality formula_l formula_r in
      let na = aux_bd1 refl_formula in
      let a = aux_bd2 refl_formula in
      let refl_cl = lmkResV na a [] (Some [refl_formula]) in
-     refl_cl
+     refl_cl)
   
 let handle_rewrite_nonbool _ = assert false
 
