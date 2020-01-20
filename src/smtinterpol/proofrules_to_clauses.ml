@@ -317,30 +317,25 @@ let get_single_atom_type_from_formula f =
 Input: l = (not x) r = y
    TODO proper
 *)
-let create_congruent_not l r_raw =
+let create_congruent_not x y =
   deb "create_congruent_clause_not BEG";
-  assert (not (Form.is_neg l));
-  assert (not (Form.is_neg r_raw));
-  (* Printf.printf "\nBEGIN create_congruent_not";
-   * print_latest_clause(); *)
-  let r = Form.neg r_raw in
-  let base_l = mkEquality (Form.neg l) r in (* iff (not x) (not y) *)
-  let base_r = Form.neg (mkEquality l (Form.neg r)) in (* not (iff x y) *)
-  let x_y = aux_bd2 base_l in
-  let x_ny = aux_bd1 base_r in
-  let x = lmkRes x_y x_ny [] in
-  let nx_ny = aux_bd1 base_l in
-  let nx_y = aux_bd2 base_r in
-  (* let nx = lmkResV nx_ny nx_y [] (Some [base_l; base_r; (Form.neg l)]) in *)
-  let nx = lmkRes nx_ny nx_y [] in
-  let res = lmkResV x nx [] (Some [base_l; base_r]) in
-  (* Printf.printf "\nEND create_congruent_not";
-   * print_latest_clause(); *)
+  assert (not (Form.is_neg x));
+  assert (not (Form.is_neg y));
+  let inxny = mkEquality (Form.neg x) (Form.neg y) in
+  let nixy = Form.neg (mkEquality x y) in
+  let inxny_x_y = aux_bd1 inxny in
+  let nixy_x_ny = aux_bd1 nixy in
+  let inxny_nixy_x = lmkRes inxny_x_y nixy_x_ny [] in
+  let inxny_nx_ny = aux_bd2 inxny in
+  let nixy_nx_y = aux_bd2 nixy in
+  let inxny_nixy_nx = lmkRes inxny_nx_ny nixy_nx_y [] in
+  let res = lmkResV inxny_nixy_x inxny_nixy_nx [] (Some [inxny; nixy]) in
   deb "create_congruent_clause_not END";
   res
 
 let create_congruent_clause f equalities =
   match f, equalities with
+  (* Special case: negation is not represented as an Fop in SMTCoq. *)
   | f, [e] when (Form.is_neg f) -> create_congruent_not (Form.neg f) e
   | _ -> assert false
 
