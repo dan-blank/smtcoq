@@ -71,16 +71,35 @@ and from_fproof termcontext annotation =
     Equality (fp, ep)
 
 
-let construct_cc_lemma t _ =
+let construct_cc_lemma_cong t _ =
   match t with
   | TermQualIdTerm (_, _, (_, h::tl)) ->
     let main_form = from_formula h in
     let neg_forms = List.map (fun fterm -> from_formula fterm ) tl in
     L_CC_Congruence (main_form, neg_forms)
 
+let construct_cc_lemma_trans t _ =
+  match t with
+  | TermQualIdTerm (_, _, (_, h::tl)) ->
+    let main_form = from_formula h in
+    let neg_forms = List.map (fun fterm -> from_formula fterm ) tl in
+    L_CC_Transitivity (main_form, neg_forms)
+
+let string_of_symbol sy =
+  match sy with
+  | Symbol (_, s) -> s
+
+let is_congruence_lemma av =
+  match av with
+  | AttributeValSexpr (_, (_, [_;_; SexprInParen (_, (_, [_;_]))])) -> true
+  | _ -> false
+
 let handle_lemma t a =
   match a with
-  | [AttributeKeywordValue (_, ":CC", av)] -> construct_cc_lemma t av
+  | [AttributeKeywordValue (_, ":CC", av)] ->
+    if (is_congruence_lemma av)
+    then construct_cc_lemma_cong t av
+    else construct_cc_lemma_trans t av
 
 let rec from_annotated_clause_proof term =
   match term with

@@ -45,13 +45,11 @@ let sexpr_to_string sexpr =
   print_sexpr strformater sexpr;
   flush_str_formatter ()
 
-let parse_sexpr_as_term = function
+let parse_sexpr_as_term (sexpr : Smtlib2_ast.sexpr) : Smtlib2_ast.term =
+  match sexpr with
   | s ->
-    let strformater = Format.str_formatter in
-    print_sexpr strformater s;
-    let sexpr_string = flush_str_formatter () in
-    (* TODO Recursiv behandeln, könnte let terms beinhalten
-    variable einführen etc. *)
+    let sexpr_string = sexpr_to_string s in
+    (* Printf.printf "\n woah so: %s" sexpr_string; *)
     Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string sexpr_string)
 
 let transform_sexpr_to_term_and_return_symbol sexpr =
@@ -60,15 +58,17 @@ let transform_sexpr_to_term_and_return_symbol sexpr =
   Hashtbl.add term_table (string_of_symbol s) transformed_sexpr;
   SexprSymbol(l,s)
 
-let transform_sexpr_list = function
-  | sl -> List.map transform_sexpr_to_term_and_return_symbol sl
+let transform_sexpr_in_paren = function
+  | SexprInParen (l1, (l2, sl)) ->
+    (* Printf.printf "\n: transform sepr list %i" (List.length sl); *)
+    SexprInParen (l1, (l2, List.map transform_sexpr_to_term_and_return_symbol sl))
 
 (* Given a tuple of a String keyword and a sexpr attribute-value, transform any term in that attribute-value into a symbol. Any term transformed this way is put into the termtable. Return an attribute-value where every occurrence of an term is replaced by the corresponding symbol.*)
 let flatten_attribute_keyword_value_sexpr = function
-  | ":CC", AttributeValSexpr (l1, (l2, at :: a :: sl)) ->
+  | ":CC", AttributeValSexpr (l1, (l2, [at ; a; sl])) ->
     let tabulated_annotated_term = transform_sexpr_to_term_and_return_symbol at in
-    let tabulated_sexpr_list = transform_sexpr_list sl in
-    AttributeValSexpr (l1, (l2, tabulated_annotated_term  :: a :: tabulated_sexpr_list))
+    let tabulated_sexpr_list = transform_sexpr_in_paren sl in
+    AttributeValSexpr (l1, (l2, [tabulated_annotated_term  ; a ; tabulated_sexpr_list]))
   | ":pivot", AttributeValSexpr (l1, (l2, _ :: t :: _)) ->
     let tabulated_annotated_term = transform_sexpr_to_term_and_return_symbol t in
     AttributeValSexpr (l1, (l2, [tabulated_annotated_term]))
