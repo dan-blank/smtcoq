@@ -16,7 +16,7 @@ let clauses : SmtAtom.Form.t clause list ref = ref []
 let roots : SmtAtom.Form.t clause list ref = ref []
 
 let print_latest_clause () =
-  let get_last_id ls = if (0 != List.length ls) then (List.hd (List.rev ls)).id else 0 in
+  let get_last_id ls = if (0 != List.length ls) then (List.hd (List.rev ls)).id else (-1) in
   (* let get_last_id ls = List.length ls in *)
   let last = max (get_last_id !clauses) (get_last_id !roots) in
   Printf.printf " last clause or root: %i" last
@@ -95,9 +95,12 @@ let negate_formula f =
   SmtAtom.Form.neg (formula)
 
 let mkResV c1 c2 tl v =
-  Printf.printf "\mmkResV-------------";
+  (* Printf.printf "\mmkResV-------------"; *)
   match v with | (Some vs) -> List.iter (fun t -> pp_form (Form.pform t)) vs;
   mk_scertif (Res { rc1 = c1; rc2 = c2; rtail = tl }) v
+
+(* TODO Hack: for now, lemmas are always assumed to be atomic equalities*)
+let isBooleanEquality f = false
 
 let isPredicateFormula f = assert false
 
@@ -290,20 +293,6 @@ let handle_trans_bool dummy = assert false
 let handle_trans_nonbool dummy = assert false
 let translate_trans f ts = assert false
 
-let generate_cong_subpath f typed_op =
-  let BO_eq typ = typed_op in
-  let f_pos = Form.pform f in
-  let Fatom (raw_atom) = f_pos in
-  (* let hatom = Atom.get VeritSyntax.ra raw_atom in *)
-  (* Atom.to_smt Format.std_formatter raw_atom; *)
-  let Abop(_, l, r) = Atom.atom raw_atom in
-  let Aapp (_, lhs) = Atom.atom l in
-  (* Array.iter (fun x -> Atom.to_smt Format.std_formatter x) lhs; *)
-  let Aapp (_, rhs) = Atom.atom r in
-  (* Array.iter (fun x -> Atom.to_smt Format.std_formatter x) rhs; *)
-  (* print_string ("\nfinds " ^ (string_of_int (Array.length lhs))); *)
-  Array.map2 (fun x y -> Atom.mk_eq VeritSyntax.ra typ x y) lhs rhs 
-
 let get_single_atom_type_from_formula f =
   let Fatom a = f in
   match Atom.atom a with
@@ -346,8 +335,6 @@ let create_transitive_clause_not a b c =
   deb "create_transitive_clause_not BEG";
   (* This derivation only works when a, b and c are distinct.
   For example, if a and b were equal, then niab_a_nb would evaluate to true (since then nb = na and { (na a) } == { true })*)
-  assert(not (Form.equal a b));
-  assert(not (Form.equal b c));
   let niab = Form.neg (mkEquality a b) in
   let nibc = Form.neg (mkEquality b c) in
   let iac = mkEquality a c in
@@ -474,12 +461,12 @@ let rec visit_formula_proof form =
           | _ ->
             (* let (a,b,c) = get_whole_and_sub_formulas ep_cl.value in *)
             (* print_latest_clause(); *)
-            (* let ib1 = lmkOther (ImmBuildDef2 ep_cl) ep_cl.value in
-             * let res1 = lmkRes ib1 fproof_clause [] in *)
-            let (Some [iff_formula]) = ep_cl.value in
-            let ninab = aux_bd2 (Form.neg iff_formula) in
-            let res2 = lmkRes ninab ep_cl [] in
-            let res1 = lmkRes res2 fproof_clause [] in
+            let ib1 = lmkOther (ImmBuildDef2 ep_cl) ep_cl.value in
+            let res1 = lmkRes ib1 fproof_clause [] in
+            (* let (Some [iff_formula]) = ep_cl.value in
+             * let ninab = aux_bd2 (Form.neg iff_formula) in
+             * let res2 = lmkRes ninab ep_cl [] in
+             * let res1 = lmkRes res2 fproof_clause [] in *)
             res1
          ) in
          deb "Equality END";
@@ -547,11 +534,23 @@ let generate_subpath_from_arg f (raw_ns: SmtAtom.Form.t list) =
 (* TODO Add transitivity *)
 let handle_lemma = function
   | L_CC_Congruence (f, ns)->
-    let nfs = generate_subpath_from_arg f ns in
-    let nfs = Array.to_list nfs in
-    let lemma_cl = lmkOther (EqCgr (f, nfs)) None in
-    Printf.printf "\n# handle_lemma Congruence %i" lemma_cl.id;
-    lemma_cl
+    if (isBooleanEquality f)
+    then (assert false)
+    else
+      deb "handle_lemma CC_Cong BEG";
+      let nfs = generate_subpath_from_arg f ns in
+      let nfs = Array.to_list nfs in
+      let lemma_cl = lmkOther (EqCgr (f, nfs)) None in
+      deb "handle_lemma CC_Cong END";
+      lemma_cl
+  | L_CC_Transitivity (f, ns) ->
+    if (isBooleanEquality f)
+    then (assert false)
+    else
+      let nfs = generate_subpath_from_arg f ns in
+      (* let nfs = List.map (fun (Some x) -> x) (List.filter isSome (Array.to_list nfs)) in *)
+      let lemma_cl = lmkOther (EqTr (f, ns)) None in
+      lemma_cl
 
 let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t SmtCertif.clause =
   (* print_string "\npt_to_smtcoq: visit_clause_proof: Begin"; *)

@@ -75,14 +75,14 @@ let construct_cc_lemma_cong t _ =
   match t with
   | TermQualIdTerm (_, _, (_, h::tl)) ->
     let main_form = from_formula h in
-    let neg_forms = List.map (fun fterm -> from_formula fterm ) tl in
+    let neg_forms = List.map from_formula tl in
     L_CC_Congruence (main_form, neg_forms)
 
 let construct_cc_lemma_trans t _ =
   match t with
   | TermQualIdTerm (_, _, (_, h::tl)) ->
     let main_form = from_formula h in
-    let neg_forms = List.map (fun fterm -> from_formula fterm ) tl in
+    let neg_forms = List.map from_formula tl in
     L_CC_Transitivity (main_form, neg_forms)
 
 let string_of_symbol sy =
