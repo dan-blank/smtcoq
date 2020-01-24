@@ -168,12 +168,14 @@ let create_intern_true_eq (iixt : SmtAtom.Form.t) =
   deb "create_intern_true_eq BEG";
   let ixt = get_subformula iixt 1 in
   let iixt_x_nixt = aux_bd2 iixt in
-  let ixt_nx_false = aux_bd1 ixt in
-  let iixt_ixt = lmkRes iixt_x_nixt ixt_nx_false [] in
+  let ixt_nx_ntrue = aux_bd1 ixt in
+  let iixt_ixt_ntrue = lmkRes iixt_x_nixt ixt_nx_ntrue [] in
   let iixt_nx_nixt = aux_bd1 iixt in
-  let nixt_x_false = aux_bd1 (Form.neg ixt) in
-  let iixt_nixt = lmkRes iixt_nx_nixt nixt_x_false [] in
-  let iixt = lmkResV iixt_ixt iixt_nixt [] (Some [iixt]) in
+  let nixt_x_ntrue = aux_bd1 (Form.neg ixt) in
+  let iixt_nixt_ntrue = lmkRes iixt_nx_nixt nixt_x_ntrue [] in
+  let iixt_ntrue = lmkRes iixt_ixt_ntrue iixt_nixt_ntrue [] in
+  let cl_true = lmkOther True None in
+  let iixt = lmkResV iixt_ntrue cl_true [] (Some [iixt]) in
   deb "create_intern_true_eq END";
   iixt
 
@@ -340,25 +342,26 @@ let create_congruent_clause f equalities =
   | _ -> assert false
 
 (* TODO a b c positiv negativ? *)
-let create_transitive_clause_not a b_pos c_pos =
+let create_transitive_clause_not a b c =
   deb "create_transitive_clause_not BEG";
-  (* let a = if (Form.is_neg a_pos) then Form.neg a_pos else a_pos in *)
-  let b = Form.neg b_pos in
-  let c = Form.neg c_pos in
-  let neq_ab = Form.neg (mkEquality a b) in
-  let neq_bc = Form.neg (mkEquality b c) in
-  let eq_ac = mkEquality a c in
-  let a_nb = aux_bd1 neq_ab in
-  let b_nc = aux_bd1 neq_bc in
-  let a_nc = lmkRes a_nb b_nc [] in
-  let a_c = aux_bd2 eq_ac in
-  let a = lmkRes a_nc a_c [] in
-  let na_b = aux_bd2 neq_ab in
-  let nb_c = aux_bd2 neq_bc in
-  let na_c = lmkRes na_b nb_c [] in
-  let na_nc = aux_bd1 eq_ac in
-  let na = lmkRes na_c na_nc [] in
-  let res = lmkResV na a [] (Some [eq_ac; neq_ab; neq_bc]) in
+  (* This derivation only works when a, b and c are distinct.
+  For example, if a and b were equal, then niab_a_nb would evaluate to true (since then nb = na and { (na a) } == { true })*)
+  assert(not (Form.equal a b));
+  assert(not (Form.equal b c));
+  let niab = Form.neg (mkEquality a b) in
+  let nibc = Form.neg (mkEquality b c) in
+  let iac = mkEquality a c in
+  let niab_a_nb = aux_bd1 niab in
+  let nibc_b_nc = aux_bd1 nibc in
+  let niab_nibc_a_nc = lmkRes niab_a_nb nibc_b_nc [] in
+  let iac_a_c = aux_bd2 iac in
+  let niab_nibc_iac_a = lmkRes niab_nibc_a_nc iac_a_c [] in
+  let niab_na_b = aux_bd2 niab in
+  let nibc_nb_c = aux_bd2 nibc in
+  let niab_nibc_na_c = lmkRes niab_na_b nibc_nb_c [] in
+  let iac_na_nc = aux_bd1 iac in
+  let niab_nibc_iac_na = lmkRes niab_nibc_na_c iac_na_nc [] in
+  let res = lmkResV niab_nibc_iac_a niab_nibc_iac_na [] (Some [iac; niab; nibc]) in
   deb "create_transitive_clause_not END";
   res
 
@@ -388,18 +391,21 @@ let rec visit_equality_proof ep existsclause =
         let cong_cl_raw = create_congruent_clause l_sub [r_sub] in
         (* print_certif Form.to_smt Atom.to_smt (get_last cong_cl_raw) ".cert_cong"; *)
         let (Some [cong_formula; _]) = (get_last cong_cl_raw).value in
-        let cong_cl = lmkRes recl cong_cl_raw [] in
-        (* Might not work, when value is set incorrectly. *)
+        let cong_cl = lmkResV recl cong_cl_raw [] (Some [cong_formula]) in
         let cong_sub0 = get_subformula cong_formula 0 in
         let cong_sub1 = get_subformula cong_formula 1 in
         let l_sub0 = get_subformula le_formula 0 in
-        let trans_cl_raw = create_transitive_clause_not l_sub0 cong_sub0 cong_sub1 in
-        let res1 = lmkRes trans_cl_raw lecl [] in
-        let res = lmkRes res1 cong_cl [] in
-        (* let res = lmkRes trans_cl_raw lecl [] in *)
-        (* Printf.printf "\n# Congruence %i" res.id; *)
-        deb "Congruence END";
-        res
+        if ((Form.equal cong_sub0 cong_sub1) && (Form.equal cong_sub0 l_sub0))
+        then (
+          let trans_cl_raw = create_transitive_clause_not l_sub0 cong_sub0 cong_sub1 in
+          let res1 = lmkRes trans_cl_raw lecl [] in
+          let res = lmkRes res1 cong_cl [] in
+          deb "Congruence END";
+          res)
+        else (
+          let res = cong_cl in
+          deb "Congruence END";
+          res)
       | Transitivity (lep, rep) ->
         deb "Transitivity BEG";
         let lecl = visit_equality_proof lep existsclause in
@@ -468,8 +474,12 @@ let rec visit_formula_proof form =
           | _ ->
             (* let (a,b,c) = get_whole_and_sub_formulas ep_cl.value in *)
             (* print_latest_clause(); *)
-            let ib1 = lmkOther (ImmBuildDef2 ep_cl) None in
-            let res1 = lmkRes ib1 fproof_clause [] in
+            (* let ib1 = lmkOther (ImmBuildDef2 ep_cl) ep_cl.value in
+             * let res1 = lmkRes ib1 fproof_clause [] in *)
+            let (Some [iff_formula]) = ep_cl.value in
+            let ninab = aux_bd2 (Form.neg iff_formula) in
+            let res2 = lmkRes ninab ep_cl [] in
+            let res1 = lmkRes res2 fproof_clause [] in
             res1
          ) in
          deb "Equality END";
