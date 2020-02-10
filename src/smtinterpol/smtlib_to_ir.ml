@@ -56,8 +56,10 @@ let rec walk_equality_proof term =
 *)
 let rec walk_formula_proof term =
   let handle_split_annotation = function
-    | ":xor-1" -> Split_xor_1
-    | ":xor-2" -> Split_xor_2
+    | ":xor-1" -> Split_xor_minus_1
+    | ":xor-2" -> Split_xor_minus_2
+    | ":xor+1" -> Split_xor_plus_1
+    | ":xor+2" -> Split_xor_plus_2
     | ":notOr" -> Split_notOr in
   match (deconstruct_qualidterm term) with
   | "@asserted", [ft] ->
