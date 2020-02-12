@@ -144,7 +144,7 @@ let import_trace fsmt fproof =
   let TermQualIdTerm (_, i, (_, tl)) = xy in
   (* Printf.printf "\n* %s %i" (string_of_qualidentifier i) (List.length tl);
    * print_term Format.std_formatter xy; *)
-  let prooftree = from_clause_proof (string_of_qualidentifier i) tl in
+  let prooftree = walk_clause_proof xy in
 
   Printf.printf "\n Translating proofrules to clauses ...";
   let certif_after_translation = visit_clause_proof prooftree in
