@@ -48,26 +48,19 @@ let rec from_eproof rulename bodyterm =
     let formula = from_formula formula_term in
     Reflexivity formula
 
-let rec from_annotated_fproof term closest_annotation =
-  match term with
-  | TermExclimationPt (_, t, a) ->
-    from_annotated_fproof t (Some a)
-  | TermQualIdTerm (_, i, (_, tl)) ->
-    from_fproof (string_of_qualidentifier i,tl) closest_annotation
-
-and from_fproof termcontext annotation =
-  match termcontext with
+and from_fproof rulename bodyterm =
+  match rulename, bodyterm with
   | "@asserted", [formula_term] ->
     let f = from_formula formula_term in
     Asserted f
-  | "@split", [TermExclimationPt (_, formula_proof_term, split_annotation); formula_term] ->
-    let fp = from_annotated_fproof formula_proof_term annotation in
+  | "@split", [TermExclimationPt (_, TermQualIdTerm (_, i, (_, targs)), split_annotation); formula_term] ->
+    let fp = from_fproof (string_of_qualidentifier i) targs in
     let f = from_formula formula_term in
     let a = from_split_annotation (string_of_single_atttribute split_annotation) in
     Split (fp, f, a)
-  | "@eq", [formula_proof; TermQualIdTerm (_, i, (_, tl))] ->
-    let fp = from_annotated_fproof formula_proof annotation in
-    let ep = from_eproof (string_of_qualidentifier i) tl in
+  | "@eq", [TermQualIdTerm (_, i1, (_, targs1)); TermQualIdTerm (_, i2, (_, targs2))] ->
+    let fp = from_fproof (string_of_qualidentifier i1) targs1 in
+    let ep = from_eproof (string_of_qualidentifier i2) targs2 in
     Equality (fp, ep)
 
 
@@ -101,20 +94,16 @@ let handle_lemma t a =
     then construct_cc_lemma_cong t av
     else construct_cc_lemma_trans t av
 
-let rec from_annotated_clause_proof term =
-  match term with
-  | TermExclimationPt (_, t, a) ->
-    from_annotated_clause_proof t 
-  | TermQualIdTerm (_, i, (_, tl)) ->
-    from_clause_proof (string_of_qualidentifier i) tl
-
-and from_clause_proof rulename bodyterm =
+let rec from_clause_proof rulename bodyterm =
   match rulename, bodyterm with
   | "@res", clause_proof_terms ->
-    let head_clause :: cls = List.map from_annotated_clause_proof clause_proof_terms in
+    let rec discard_clause_annotation term = (match term with
+        | TermExclimationPt (_, t, a) -> discard_clause_annotation t 
+        | TermQualIdTerm (_, i, (_, tl)) -> from_clause_proof (string_of_qualidentifier i) tl) in
+    let head_clause :: cls = List.map discard_clause_annotation clause_proof_terms in
     List.fold_left (fun acc cl -> Resolution (acc, cl)) head_clause cls
-  | "@clause", [fpterm; fterm] ->
-    let fp = from_annotated_fproof fpterm None in
+  | "@clause", [TermQualIdTerm (_, i, (_, tl)); fterm] ->
+    let fp = from_fproof (string_of_qualidentifier i) tl in
     let f = from_formula fterm in
     Clause (fp, f)
   | "@lemma", [TermExclimationPt (_, t, (_, al))] ->
