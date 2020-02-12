@@ -3,9 +3,8 @@ open Prooftree_ast
 open Tabulation
 open Proofrules_to_clauses
 open SmtAtom
+open Smtinterpol_util
 
-let string_of_single_atttribute = function
-  | (_, [AttributeKeyword (_, s)]) -> s
 
 let from_split_annotation = function
   | ":xor-1" -> Split_xor_1
@@ -22,8 +21,6 @@ let from_formula term =
     let ra = VeritSyntax.ra in
     let rf = VeritSyntax.rf in
     let r = Smtlib2_genConstr.make_root ra rf term in
-    (* Printf.printf "\n ";
-     * Form.to_smt Atom.to_smt Format.std_formatter r; *)
     r
 
 
@@ -47,8 +44,8 @@ let rec from_eproof rulename bodyterm =
   | "@refl", [formula_term] ->
     let formula = from_formula formula_term in
     Reflexivity formula
-
-and from_fproof rulename bodyterm =
+      
+let rec from_fproof rulename bodyterm =
   match rulename, bodyterm with
   | "@asserted", [formula_term] ->
     let f = from_formula formula_term in
@@ -78,9 +75,6 @@ let construct_cc_lemma_trans t _ =
     let neg_forms = List.map from_formula tl in
     L_CC_Transitivity (main_form, neg_forms)
 
-let string_of_symbol sy =
-  match sy with
-  | Symbol (_, s) -> s
 
 let is_congruence_lemma av =
   match av with
