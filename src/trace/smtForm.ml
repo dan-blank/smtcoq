@@ -163,7 +163,8 @@ module Make (Atom:ATOM) =
          to_smt_pform atom_to_smt fmt hp.hval
       | Neg hp ->
          if pi then Format.fprintf fmt "%s" (string_of_int hp.index ^ ":");
-         Format.fprintf fmt "(not ";
+         (* Format.fprintf fmt "(Formula-not "; *)
+         Format.fprintf fmt "(¬";
          to_smt_pform atom_to_smt fmt hp.hval;
          Format.fprintf fmt ")"
 
@@ -185,13 +186,13 @@ module Make (Atom:ATOM) =
       (match op with
          | Ftrue -> Format.fprintf fmt "true"
          | Ffalse -> Format.fprintf fmt "false"
-         | Fand -> Format.fprintf fmt "and"
-         | For -> Format.fprintf fmt "or"
+         | Fand -> Format.fprintf fmt "∧"
+         | For -> Format.fprintf fmt "∨"
          | Fxor -> Format.fprintf fmt "xor"
          | Fimp -> Format.fprintf fmt "=>"
-         | Fiff -> Format.fprintf fmt "iff"
+         | Fiff -> Format.fprintf fmt "="
          | Fite -> Format.fprintf fmt "ite"
-         | Fnot2 _ -> ()
+         | Fnot2 _ -> Format.fprintf fmt "[¬¬]"
          | Fforall l ->
             (Format.fprintf fmt "forall (";
              to_smt_args fmt l;

@@ -1,0 +1,8 @@
+(set-option :produce-proofs true)
+(set-option :print-terms-cse false)
+(set-logic QF_UF)
+(declare-fun x () Bool)
+(assert (or x (and x true)))
+(assert (not x))
+(check-sat)
+(get-proof)

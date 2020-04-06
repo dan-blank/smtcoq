@@ -123,8 +123,8 @@ let add_roots_and_non_roots () =
   adjust_root_pos_values (List.hd !clauses) (-1)
 
 
-let lmkOther rule value =
-  let clause = mkOther rule value in
+let lmkOther split_rule value =
+  let clause = mkOther split_rule value in
   clauses := List.append !clauses [clause];
   clause
 
@@ -295,16 +295,6 @@ let handle_trans_bool dummy = assert false
 let handle_trans_nonbool dummy = assert false
 let translate_trans f ts = assert false
 
-let get_single_atom_type_from_formula f =
-  let Fatom a = f in
-  match Atom.atom a with
-  | Acop _ -> Printf.printf "\n acop"; assert false
-  | Auop _ -> Printf.printf "\n auop"; assert false
-  | Abop (typed_op, _, _) -> typed_op
-  | Atop _ -> Printf.printf "\n atop"; assert false
-  | Anop _ -> Printf.printf "\n anop"; assert false
-  | Aapp _ -> Printf.printf "\n aapp"; assert false
-
 
 (*
 Input: l = (not x) r = y
@@ -337,11 +327,14 @@ let create_transitive_clause_not a b c =
   deb "create_transitive_clause_not BEG";
   (* This derivation only works when a, b and c are distinct.
   For example, if a and b were equal, then niab_a_nb would evaluate to true (since then nb = na and { (na a) } == { true })*)
+  assert (not (a == b));
+  assert (not (b == c));
+  assert (not (a == c));
   let niab = Form.neg (mkEquality a b) in
   let nibc = Form.neg (mkEquality b c) in
   let iac = mkEquality a c in
   let niab_a_nb = aux_bd1 niab in
-  let nibc_b_nc = aux_bd1 nibc in
+  let nibc_b_nc = aux_bd2 nibc in
   let niab_nibc_a_nc = lmkRes niab_a_nb nibc_b_nc [] in
   let iac_a_c = aux_bd2 iac in
   let niab_nibc_iac_a = lmkRes niab_nibc_a_nc iac_a_c [] in
@@ -355,39 +348,35 @@ let create_transitive_clause_not a b c =
   res
 
 
-let rec visit_equality_proof ep existsclause =
-  if Hashtbl.mem equality_proof_table ep then Hashtbl.find equality_proof_table ep else
-    let new_c =
+let rec visit_equality_proof ep proven_c =
+  if Hashtbl.mem equality_proof_table ep
+  then Hashtbl.find equality_proof_table ep
+  else
+    let c =
     (match ep with
-      | Rewrite (formula, rule) ->
+      | Rewrite (form, split_rule) ->
         deb "Rewrite BEG";
-        let c = translate_rewrite existsclause rule formula in
+        let c = translate_rewrite proven_c split_rule form in
         deb "Rewrite END";
         c
       | Congruence (lep, rep) ->
         deb "Congruence BEG";
-        let lecl = visit_equality_proof lep existsclause in
-        let recl = visit_equality_proof rep existsclause in
-        let (Some [le_formula]) = (get_last lecl).value in
-        let (Some [re_formula]) = (get_last recl).value in
-        (* Printf.printf "\nCongruence left and right BEGIN"; *)
-        let l_sub = get_subformula le_formula 1 in
-        let r_sub = get_subformula re_formula 1 in
-        (* Form.to_smt Atom.to_smt Format.std_formatter l_sub; *)
-        (* Printf.printf "\n";
-         * Form.to_smt Atom.to_smt Format.std_formatter r_sub;
-         * Printf.printf "\nCongruence left and right END"; *)
-        let cong_cl_raw = create_congruent_clause l_sub [r_sub] in
-        (* print_certif Form.to_smt Atom.to_smt (get_last cong_cl_raw) ".cert_cong"; *)
+        let c1 = visit_equality_proof lep proven_c in
+        let c2 = visit_equality_proof rep proven_c in
+        let (Some [form1]) = (get_last c1).value in
+        let (Some [form2]) = (get_last c2).value in
+        let sub1_form = get_subformula form1 1 in
+        let sub2_form = get_subformula form2 1 in
+        let cong_cl_raw = create_congruent_clause sub1_form [sub2_form] in
         let (Some [cong_formula; _]) = (get_last cong_cl_raw).value in
-        let cong_cl = lmkResV recl cong_cl_raw [] (Some [cong_formula]) in
+        let cong_cl = lmkResV c2 cong_cl_raw [] (Some [cong_formula]) in
         let cong_sub0 = get_subformula cong_formula 0 in
         let cong_sub1 = get_subformula cong_formula 1 in
-        let l_sub0 = get_subformula le_formula 0 in
+        let l_sub0 = get_subformula form1 0 in
         if ((Form.equal cong_sub0 cong_sub1) && (Form.equal cong_sub0 l_sub0))
         then (
           let trans_cl_raw = create_transitive_clause_not l_sub0 cong_sub0 cong_sub1 in
-          let res1 = lmkRes trans_cl_raw lecl [] in
+          let res1 = lmkRes trans_cl_raw c1 [] in
           let res = lmkRes res1 cong_cl [] in
           deb "Congruence END";
           res)
@@ -397,13 +386,13 @@ let rec visit_equality_proof ep existsclause =
           res)
       | Transitivity (lep, rep) ->
         deb "Transitivity BEG";
-        let lecl = visit_equality_proof lep existsclause in
-        let recl = visit_equality_proof rep existsclause in
-        let (Some [le_formula]) = (get_last lecl).value in
-        let (Some [re_formula]) = (get_last recl).value in
-        let a = get_subformula le_formula 0 in
-        let (b : SmtAtom.Form.t) = get_subformula le_formula 1 in
-        let (c : SmtAtom.Form.t) = get_subformula re_formula 1 in
+        let c1 = visit_equality_proof lep proven_c in
+        let c2 = visit_equality_proof rep proven_c in
+        let (Some [form1]) = (get_last c1).value in
+        let (Some [form2]) = (get_last c2).value in
+        let a = get_subformula form1 0 in
+        let (b : SmtAtom.Form.t) = get_subformula form1 1 in
+        let (c : SmtAtom.Form.t) = get_subformula form2 1 in
         let eq_to_show = mkEquality a c in
         let first_neg = Form.neg (mkEquality a b) in
         let second_neg = Form.neg (mkEquality b c) in
@@ -413,79 +402,54 @@ let rec visit_equality_proof ep existsclause =
         let res = lmkResV trans first_neg_clause [second_neg_clause] (Some [eq_to_show]) in
         deb "Transitivity END";
         res
-      | Reflexivity formula ->
+      | Reflexivity form ->
         deb "Reflexivity BEG";
-        let refl_formula = mkEquality formula formula in
+        let refl_formula = mkEquality form form in
         let na = aux_bd1 refl_formula in
         let a = aux_bd2 refl_formula in
         let refl_cl = lmkResV na a [] (Some [refl_formula]) in
         deb "Reflexivity END";
         refl_cl) in
-    Hashtbl.add equality_proof_table ep new_c;
-    new_c
-
-let is_simplification_rewrite pr =
-  match pr with
-  | Rewrite (_, Rewrite_notSimp) -> true
-  | _ -> false
-
-let get_whole_and_sub_formulas cv =
-  match cv with
-  | Some [form] ->
-    let lhs = get_subformula form 0 in
-    let rhs = get_subformula form 1 in
-    (form, lhs, rhs)
-  | None -> assert false
-  | Some _ -> assert false
-
-let rec walk_formula_proof form =
-  if Hashtbl.mem formula_proof_table form then Hashtbl.find formula_proof_table form else
-    let new_c =
-      (match form with
-      (* | Tautology (f, _) -> visit_formula f *)
-       | Asserted (f) ->
-         (* Printf.printf ("\n hey Asserted ------------------ \n"); *)
-         (* pp_form (Form.pform f); *)
-         deb "Asserted BEG";
-         let r = lmkRootV [f] in
-         deb "Asserted END";
-         r
-       | Equality (fp, ep) ->
-         deb "Equality BEG";
-         let fproof_clause = walk_formula_proof fp in
-         (* let imm_clause = lmkOther (ImmBuildDef2 fproof_clause) None in
-          * link fproof_clause imm_clause; *)
-         let ep_cl = visit_equality_proof ep fproof_clause in
-         let retval = (match ep with
-          | Rewrite (_, Rewrite_notSimp) ->
-            (* print_latest_clause(); *)
-            ep_cl
-          | _ ->
-            (* let (a,b,c) = get_whole_and_sub_formulas ep_cl.value in *)
-            (* print_latest_clause(); *)
-            let ib1 = lmkOther (ImmBuildDef2 ep_cl) ep_cl.value in
-            let res1 = lmkRes ib1 fproof_clause [] in
-            (* let (Some [iff_formula]) = ep_cl.value in
-             * let ninab = aux_bd2 (Form.neg iff_formula) in
-             * let res2 = lmkRes ninab ep_cl [] in
-             * let res1 = lmkRes res2 fproof_clause [] in *)
-            res1
-         ) in
-         deb "Equality END";
-         retval
-       | Split (fp, f, rule) ->
-         deb "Split BEG";
-         let unsplit_clause = walk_formula_proof fp in
-         let retval = translate_split unsplit_clause rule in
-         deb "Split END";
-         retval) in
-    Hashtbl.add formula_proof_table form new_c;
-    new_c
-(* let hack_replace_atom_op a op = *)
+    Hashtbl.add equality_proof_table ep c;
+    c
 
 
 
-let generate_subpath f negated_equalities_fs =
+let rec walk_formula_proof fp =
+  if Hashtbl.mem formula_proof_table fp
+  then Hashtbl.find formula_proof_table fp
+  else let last_c = (match fp with
+      | Asserted (f) ->
+        (* deb "Asserted BEG"; *)
+        let c = lmkRootV [f] in
+        (* deb "Asserted END"; *)
+        c
+      | Equality (fp, ep) ->
+        (* deb "Equality BEG"; *)
+        let x_c = walk_formula_proof fp in
+        let ixy_c = visit_equality_proof ep x_c in
+        let c = (match ep with
+            | Rewrite (_, Rewrite_notSimp) -> ixy_c
+            | _ ->
+              let nx_y_c = lmkOther (ImmBuildDef2 ixy_c) ixy_c.value in (* Check: ixy_c.value is not the correct value! *)
+              let y_c = lmkRes nx_y_c x_c [] in
+              y_c) in
+        (* deb "Equality END"; *)
+        c
+      | Split (fp, f, split_rule) ->
+        (* deb "Split BEG"; *)
+        let c1 = walk_formula_proof fp in
+        let c2 = translate_split c1 split_rule in
+        (* deb "Split END"; *)
+        c2) in
+    Hashtbl.add formula_proof_table fp last_c;
+    last_c
+
+
+(*
+   purpose: Wrap the right equalities in "Some", potentially generate missing equalities (e.g. (= x x))
+*)
+let generate_subpath form negated_equality_forms =
   let wrap_equality_formula_in_option hatom1 hatom2 hatoms =
     let do_hatoms_appear_in_atomic_binary_operation atom hatom1 hatom2 =
       match atom with
@@ -499,33 +463,30 @@ let generate_subpath f negated_equalities_fs =
     match matching_hatoms with
     | [inequalitiy_hatom] -> Some inequalitiy_hatom
     | _ -> None in
-  let gpform = Form.pform f in
+  let gpform = Form.pform form in
   let Fatom (atom) = gpform in
   let Abop(_, left_atom, right_atom) = Atom.atom atom in
   let Aapp (_, hatoms1) = Atom.atom left_atom in
   let Aapp (_, hatoms2) = Atom.atom right_atom in
-  Array.map2 (fun x y -> wrap_equality_formula_in_option x y negated_equalities_fs) hatoms1 hatoms2 
+  Array.map2 (fun x y -> wrap_equality_formula_in_option x y negated_equality_forms) hatoms1 hatoms2 
 
 
 let handle_lemma = function
-  | L_CC_Congruence (f, ns)->
-    if (isBooleanEquality f)
+  | L_CC_Congruence (form, negated_equality_forms)->
+    if (isBooleanEquality form)
     then (assert false)
     else
-      deb "handle_lemma CC_Cong BEG";
-      let nfs = generate_subpath f ns in
-      let nfs = Array.to_list nfs in
-      let lemma_cl = lmkOther (EqCgr (f, nfs)) None in
-      deb "handle_lemma CC_Cong END";
-      lemma_cl
-  | L_CC_Transitivity (f, ns) ->
-    if (isBooleanEquality f)
+      (* deb "handle_lemma CC_Cong BEG"; *)
+      let option_wrapped_forms = generate_subpath form negated_equality_forms in
+      let lemma_c = lmkOther (EqCgr (form, Array.to_list option_wrapped_forms)) None in
+      (* deb "handle_lemma CC_Cong END"; *)
+      lemma_c
+  | L_CC_Transitivity (form, negated_equality_forms) ->
+    if (isBooleanEquality form)
     then (assert false)
     else
-      let nfs = generate_subpath f ns in
-      (* let nfs = List.map (fun (Some x) -> x) (List.filter isSome (Array.to_list nfs)) in *)
-      let lemma_cl = lmkOther (EqTr (f, ns)) None in
-      lemma_cl
+      let lemma_c = lmkOther (EqTr (form, negated_equality_forms)) None in
+      lemma_c
 
 let rec walk_clause_proof  cp =
   if Hashtbl.mem clause_proof_table cp

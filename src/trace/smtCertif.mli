@@ -225,6 +225,8 @@ and 'hform clause = {
     mutable prev  : 'hform clause option;
     mutable next  : 'hform clause option;
     mutable value : 'hform list option;
+    mutable iffval : 'hform option;
+    mutable eqval : 'hform option
 }
 and 'hform clause_kind =
     Root

@@ -1,0 +1,25 @@
+(let ((.cse1 (f z x)) (.cse2 (f z y)))
+  (let ((.cse7 (= .cse1 .cse2)) (.cse4 (= x y)))
+    (let ((.cse3 (! .cse4 :quotedCC)) (.cse0 (! .cse7 :quotedCC)))
+      (@res
+       (@lemma (! (or .cse0 (not .cse3)) :CC (.cse0 :subpath (.cse1 .cse2))))
+       (!
+        (@clause
+         (@eq
+          (@asserted .cse4)
+          (@rewrite (! (= .cse4 .cse3) :intern)))
+         (! .cse3 :input))
+        :pivot
+        .cse3)
+       (let ((.cse5 (not .cse0)))
+         (!
+          (@clause
+           (let ((.cse6 (not .cse7)))
+             (@eq
+              (@asserted .cse6)
+              (@cong
+               (@refl .cse6)
+               (@rewrite (! (= .cse7 .cse0) :intern)))))
+           (! .cse5 :input))
+          :pivot
+          .cse5))))))

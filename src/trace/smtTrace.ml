@@ -35,7 +35,9 @@ let mk_scertif kind ov =
    used = notUsed;
    prev = None;
    next = None;
-   value = ov
+   value = ov;
+   eqval = None;
+   iffval = None;
  }
 
 (** Roots *)
@@ -50,7 +52,9 @@ let mkRootGen ov =
    used = notUsed;
    prev = None;
    next = None;
-   value = ov
+   value = ov;
+   eqval = None;
+   iffval = None;
  }
 
 let mkRoot  = mkRootGen None
@@ -133,12 +137,14 @@ let set_same c nc =
   skip c
 
 let rec get_pos c =
-  (* print_string (to_string c.kind); *)
   match c.kind with
   | Root | Res _ | Other _ ->
       begin match c.pos with
       | Some n -> n
-      | _ -> assert false
+      | _ ->
+        print_string "\n get_pos failed! clause: ";
+        print_string (string_of_int c.id);
+        assert false
       end
   | Same c -> get_pos c
 
@@ -258,11 +264,8 @@ let select c =
 (* Compute the number of occurence of each clause so that <alloc> works 
 properly *)
 let rec occur c =
-  print_string ("\noccur is called! id: " ^ (string_of_int c.id));
   match c.kind with
-  | Root ->
-    print_string "\n... and we are in root!";
-    c.used <- c.used + 1
+  | Root -> c.used <- c.used + 1
   | Res res ->
       if c.used == notUsed then
 	      begin occur res.rc1; occur res.rc2; List.iter occur res.rtail end;

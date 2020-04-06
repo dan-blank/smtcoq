@@ -674,23 +674,27 @@ module Atom =
         | Aapp ((i,op),a) ->
            let op_smt () =
              (match i with
-                | Index index -> Format.fprintf fmt "op_%i" index
+                | Index index -> Format.fprintf fmt "%i" index
                 | Rel_name name -> Format.fprintf fmt "%s" name);
              if pi then to_smt_op op
+             (* if true then to_smt_op op *)
            in
            if Array.length a = 0 then (
              op_smt ()
            ) else (
+             (* Format.fprintf fmt "( Aapp: "; *)
              Format.fprintf fmt "(";
              op_smt ();
+             (* Format.fprintf fmt " args: "; *)
              Array.iter (fun h -> Format.fprintf fmt " "; to_smt fmt h) a;
              Format.fprintf fmt ")"
            )
 
       and to_smt_op {tparams=bta; tres=bt; op_val=t} =
-        Format.fprintf fmt "[(";
-        Array.iter (fun bt -> SmtBtype.to_smt fmt bt; Format.fprintf fmt " ") bta;
-        Format.fprintf fmt ") ( ";
+        (* Format.fprintf fmt "[(";
+         * Array.iter (fun bt -> SmtBtype.to_smt fmt bt; Format.fprintf fmt " ") bta;
+         * Format.fprintf fmt ") ( "; *)
+        Format.fprintf fmt "( ";
         SmtBtype.to_smt fmt bt;
         Format.fprintf fmt " ) ( %s )]" (Pp.string_of_ppcmds (Structures.pr_constr t))
 
@@ -703,7 +707,11 @@ module Atom =
             | BO_Zle -> "<="
             | BO_Zge -> ">="
             | BO_Zgt -> ">"
-            | BO_eq _ -> "="
+            | BO_eq t ->
+              (* Format.fprintf fmt " [type: ";
+               * SmtBtype.to_smt fmt t;
+               * "=A=]" *)
+              "=="
             | BO_BVand _ -> "bvand"
             | BO_BVor _ -> "bvor"
             | BO_BVxor _ -> "bvxor"

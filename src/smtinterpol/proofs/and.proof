@@ -1,0 +1,16 @@
+(let ((.cse1 (not y)))
+  (@res
+   (@clause
+    (let ((.cse2 (not .cse1)))
+      (@eq
+       (@split
+        (!
+         (let ((.cse0 (and x y)))
+           (@eq
+            (@asserted .cse0)
+            (@rewrite (! (= .cse0 (not (or (not x) .cse1))) :andToOr))))
+         :notOr)
+        .cse2)
+       (@rewrite (! (= .cse2 y) :notSimp))))
+    (! y :input))
+   (! (@clause (@asserted .cse1) (! .cse1 :input)) :pivot .cse1)))

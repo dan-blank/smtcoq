@@ -1,0 +1,19 @@
+(@res
+ (@clause (@asserted (not x)) (! (not x) :input))
+ (!
+  (@clause
+   (@eq
+    (@asserted (or x (and x true)))
+    (@trans
+     (@cong
+      (@refl (or x (and x true)))
+      (@trans
+       (@cong
+        (@rewrite (! (= (and x true) (not (or (not x) (not true)))) :andToOr))
+        (@trans
+         (@cong
+          (@refl (or (not x) (not true)))
+          (@rewrite (! (= (not true) false) :notSimp)))
+         (@rewrite (! (= (or (not x) false) (not x)) :orSimp))))
+       (@rewrite (! (= (not (not x)) x) :notSimp))))
+     (@rewrite (! (= (or x x) x) :orSimp)))) (! x :input)) :pivot x))

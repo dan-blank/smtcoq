@@ -226,10 +226,13 @@ and 'hform clause = {
     mutable used  : used;
     mutable prev  : 'hform clause option;
     mutable next  : 'hform clause option;
-    mutable value : 'hform list option
+    mutable value : 'hform list option;
               (* This field should be defined for rules which can create atoms :
                  EqTr, EqCgr, EqCgrP, Lia, Dlde, Lra *)
-}
+    (* TODO delete both fields *)
+    mutable iffval : 'hform option;
+    mutable eqval : 'hform option
+  }
 
 and 'hform clause_kind =
   | Root
@@ -269,7 +272,7 @@ let used_clauses r =
 (* For debugging certif processing purposes : <add_scertif> <select> <occur> <alloc> *)
 let to_string ftm atm fmt r =
   match r with
-            Root -> "Root"
+            Root -> "ROOT"
           | Same c -> "Same(" ^ string_of_int (c.id) ^ ")"
           | Res r ->
              let id1 = string_of_int r.rc1.id in
@@ -279,34 +282,43 @@ let to_string ftm atm fmt r =
           | Other x -> "Other(" ^
                          begin match x with
                            | Weaken _ -> "Weaken"
-                           | ImmFlatten _ -> "ImmFlatten"
-                           | True -> "True"
+                           | ImmFlatten (c, f) ->
+                             ftm atm fmt f;
+                             "ImmFlatten id: " ^ string_of_int (c.id)
+                           | True -> "FTrue"
                            | False -> "False"
                            | BuildDef f ->
                              ftm atm fmt f;
                              "BuildDef"
-                           | BuildDef2 _ -> "BuildDef2"
+                           | BuildDef2 f ->
+                             ftm atm fmt f;
+                             "BuildDef2"
+
                            | BuildProj (f, i) ->
                              ftm atm fmt f;
                              "BuildProj"
                            | ImmBuildDef c ->
-                             print_string ("\n ImmBuildDef: " ^ string_of_int (c.id));
-                             "ImmBuildDef"
+                             "ImmBuildDef " ^ string_of_int (c.id)
                            | ImmBuildDef2 c ->
-                             print_string ("\n ImmBuilddef2: " ^ string_of_int (c.id));
-                             "ImmBuildDef2"
-                           | ImmBuildProj (c, _) ->
-                             print_string ("\n ImmBuildProj: " ^ string_of_int (c.id));
-                             "ImmBuildProj"
+                             "ImmBuildDef2 " ^ string_of_int (c.id)
+                           | ImmBuildProj (c, i) ->
+                             "ImmBuildProj " ^ string_of_int (c.id)
                            | EqTr (f, ls) ->
                              print_string ("\nEqTr , list is : " ^ (string_of_int (List.length ls)));
                              ftm atm fmt f;
-                             (* print_string "\nEqTr END: "; *)
+                             List.iter
+                               (fun o -> ftm atm fmt o)
+                               ls;
                              "EqTr"
                            | EqCgr (f, ns) ->
                              print_string ("\nEqCgr");
                              ftm atm fmt f;
-                             List.iter (fun (Some x) -> ftm atm fmt x) ns;
+
+                             List.iter
+                               (fun o -> match o with
+                                | Some x -> ftm atm fmt x
+                                | None -> ())
+                               ns;
                              "EqCgr"
                            | EqCgrP _ -> "EqCgrP"
                            | LiaMicromega _ -> "LiaMicromega"
@@ -360,7 +372,9 @@ let print_certif form_to_smt atom_to_string c where =
       | None -> "None"
       | Some p -> string_of_int p in
     let used = !r.used in
-    Format.fprintf fmt "id:%i prev:%i next:%i kind:%s pos:%s used:%i value:" id (option_clause_to_int !r.prev) (option_clause_to_int !r.next) kind pos used;
+    (* Format.fprintf fmt "id:%i prev:%i next:%i kind:%s pos:%s used:%i value:" id (option_clause_to_int !r.prev) (option_clause_to_int !r.next) kind pos used; *)
+    (* Format.fprintf fmt "id:%i kind:%s pos:%s used:%i value:" id kind pos used; *)
+    Format.fprintf fmt "id:%i kind:%s value:" id kind;
     begin match !r.value with
     | None -> Format.fprintf fmt "None"
     | Some l -> List.iter (fun f -> form_to_smt atom_to_string fmt f;

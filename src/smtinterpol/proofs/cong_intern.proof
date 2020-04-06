@@ -1,0 +1,15 @@
+(@res
+ (@clause
+  (@eq
+   (@asserted (not (f x)))
+   (@cong
+    (@refl (not (f x)))
+    (@rewrite (! (= (f x) (! (= (f x) true) :quotedCC)) :intern))))
+  (! (not (! (= (f x) true) :quotedCC)) :input))
+ (!
+  (@clause
+   (@eq
+    (@asserted (f x))
+    (@rewrite (! (= (f x) (! (= (f x) true) :quotedCC)) :intern)))
+   (! (! (= (f x) true) :quotedCC) :input))
+  :pivot (! (= (f x) true) :quotedCC)))

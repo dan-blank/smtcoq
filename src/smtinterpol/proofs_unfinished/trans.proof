@@ -1,0 +1,40 @@
+(let ((.cse6 (not a)) (.cse7 (not b)))
+  (let ((.cse9 (or .cse7 c)) (.cse2 (or .cse6 b)))
+    (let ((.cse3 (not .cse2)) (.cse10 (not .cse9)))
+      (let ((.cse19 (or .cse3 .cse10)))
+        (let ((.cse14 (not .cse19)) (.cse13 (or .cse6 c)))
+          (let
+              ((.cse12 (!
+                        (let ((.cse18 (and .cse2 .cse9)))
+                          (let ((.cse17 (not .cse18)))
+                            (let ((.cse16 (or .cse17 .cse13)))
+                              (let ((.cse15 (not .cse16)))
+                                (@eq
+                                 (@asserted .cse15)
+                                 (@cong
+                                  (@refl .cse15)
+                                  (@cong
+                                   (@refl .cse16)
+                                   (@trans
+                                    (@cong
+                                     (@refl .cse17)
+                                     (@rewrite (! (= .cse18 .cse14) :andToOr)))
+                                    (@rewrite (! (= (not .cse14) .cse19) :notSimp)))))))))) :notOr)))
+            (let ((.cse0 (! (@split .cse12 .cse14) :notOr)) (.cse4 (! (@split .cse12 (not .cse13)) :notOr)))
+              (@res
+               (@clause
+                (let ((.cse1 (not .cse3)))
+                  (@eq
+                   (@split .cse0 .cse1)
+                   (@rewrite (! (= .cse1 .cse2) :notSimp)))) (! .cse2 :input))
+               (! (@clause
+                   (let ((.cse5 (not .cse6)))
+                     (@eq
+                      (@split .cse4 .cse5)
+                      (@rewrite (! (= .cse5 a) :notSimp)))) (! a :input)) :pivot a)
+               (! (@res
+                   (@clause
+                    (let ((.cse8 (not .cse10)))
+                      (@eq (@split .cse0 .cse8)
+                           (@rewrite (! (= .cse8 .cse9) :notSimp)))) (! .cse9 :input))
+                   (let ((.cse11 (not c))) (! (@clause (@split .cse4 .cse11) (! .cse11 :input)) :pivot .cse11))) :pivot .cse7)))))))))

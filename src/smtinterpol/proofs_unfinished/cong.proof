@@ -1,0 +1,23 @@
+(@res
+ (@res
+  (@lemma (! (or (! (= (f x) (f z)) :quotedCC) (not (! (= x z) :quotedCC))) :CC ((! (= (f x) (f z)) :quotedCC) :subpath ((f x) (f z)))))
+  (! (@lemma
+      (!
+       (or (! (= x z) :quotedCC)
+           (not (! (= x y) :quotedCC))
+           (not (! (= y z) :quotedCC)))
+       :CC ((! (= x z) :quotedCC) :subpath (x y z)))) :pivot (! (= x z) :quotedCC)))
+ (!
+  (@clause
+   (@eq (@asserted (not (= (f x) (f z)))) (@cong (@refl (not (= (f x) (f z)))) (@rewrite (! (= (= (f x) (f z)) (! (= (f x) (f z)) :quotedCC)) :intern))))
+   (! (not (! (= (f x) (f z)) :quotedCC)) :input)) :pivot (not (! (= (f x) (f z)) :quotedCC)))
+ (!
+  (@clause
+   (@eq (@asserted (= x y)) (@rewrite (! (= (= x y) (! (= x y) :quotedCC)) :intern)))
+   (! (! (= x y) :quotedCC) :input))
+  :pivot (! (= x y) :quotedCC))
+ (!
+  (@clause
+   (@eq (@asserted (= y z)) (@rewrite (! (= (= y z) (! (= y z) :quotedCC)) :intern)))
+   (! (! (= y z) :quotedCC) :input))
+  :pivot (! (= y z) :quotedCC)))
