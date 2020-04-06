@@ -1,12 +1,12 @@
-open Prooftree_ast
+open Ir
 open SmtAtom
 open SmtForm
 open SmtTrace
 open SmtCertif
 
-let clause_proof_table : (Prooftree_ast.clause_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
-let equality_proof_table : (Prooftree_ast.equality_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
-let formula_proof_table : (Prooftree_ast.formula_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let clause_proof_table : (Ir.clause_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let equality_proof_table : (Ir.equality_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let formula_proof_table : (Ir.formula_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
 
 let clauses : SmtAtom.Form.t clause list ref = ref []
 let roots : SmtAtom.Form.t clause list ref = ref []

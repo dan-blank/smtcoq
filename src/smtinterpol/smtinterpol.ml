@@ -1,9 +1,10 @@
+open Smtlib2_ast
 open SmtAtom
 open SmtCertif
 open Tabulation
-open Smtlib_to_proofrules
-module C = Proofrules_to_clauses
-open Smtlib2_ast
+open Smtlib_to_ir
+module C = Ir_to_clauses
+open Ir
 open Format
 
 
@@ -183,4 +184,4 @@ let checkerdebug fsmt fproof = SmtCommands.checker_debug (import_all fsmt fproof
 Take an SMT2-formula and an SMTInterpol-proof and check whether the proof proves the formula unsatisfiable.
 This function is called when Coq calls the vernacular command 'Smtinterpol.checker'.
 *)
-let checker formula proof= SmtCommands.checker (import_all formula proof)
+let checker formula proof= SmtCommands.checker (import_all formula proof)open Smtlib2_ast

@@ -32,10 +32,6 @@ VeritSyntax
 VeritParser
 VeritLexer
 
-SmtinterpolSyntax
-SmtinterpolParser
-SmtinterpolLexer
-
 Shashcons
 Hstring
 Type
@@ -55,11 +51,10 @@ Verit
 Lfsc
 
 Smtinterpol_util
-Modified_smtlib2_printing
 Tabulation
-Prooftree_ast
-Smtlib_to_proofrules
-Proofrules_to_clauses
+Ir
+Smtlib_to_ir
+Ir_to_clauses
 Smtinterpol
 
 

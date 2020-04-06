@@ -1,5 +1,5 @@
+open Ir
 open Smtlib2_ast
-open Prooftree_ast
 open Smtinterpol_util
 
 (**
