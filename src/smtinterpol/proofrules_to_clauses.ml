@@ -8,9 +8,9 @@ open VeritSyntax
 
 exception ProofrulesToSMTCoqExpection of string
 
-let clause_table : (Prooftree_ast.clause_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
-let equality_table : (Prooftree_ast.equality_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
-let formula_table : (Prooftree_ast.formula_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let clause_proof_table : (Prooftree_ast.clause_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let equality_proof_table : (Prooftree_ast.equality_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+let formula_proof_table : (Prooftree_ast.formula_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
 
 let clauses : SmtAtom.Form.t clause list ref = ref []
 let roots : SmtAtom.Form.t clause list ref = ref []
@@ -252,12 +252,14 @@ let handle_rewrite_bool rewritee_clause rewrite_rule rewrite_formula =
      if (isTrueEqIntern rewrite_formula)
      then (create_intern_true_eq rewrite_formula) 
      else (
+       deb "Rewrite_intern true eq BEG";
      let formula_l = get_subformula rewrite_formula 0 in
      let formula_r = get_subformula rewrite_formula 1 in
      let refl_formula = mkEquality formula_l formula_r in
      let na = aux_bd1 refl_formula in
      let a = aux_bd2 refl_formula in
      let refl_cl = lmkResV na a [] (Some [refl_formula]) in
+     deb "Rewrite_intern true eq END";
      refl_cl)
   
 let handle_rewrite_nonbool _ = assert false
@@ -354,8 +356,8 @@ let create_transitive_clause_not a b c =
 
 
 let rec visit_equality_proof ep existsclause =
-  if Hashtbl.mem equality_table ep then Hashtbl.find equality_table ep else
-    let new_clause =
+  if Hashtbl.mem equality_proof_table ep then Hashtbl.find equality_proof_table ep else
+    let new_c =
     (match ep with
       | Rewrite (formula, rule) ->
         deb "Rewrite BEG";
@@ -419,8 +421,8 @@ let rec visit_equality_proof ep existsclause =
         let refl_cl = lmkResV na a [] (Some [refl_formula]) in
         deb "Reflexivity END";
         refl_cl) in
-    Hashtbl.add equality_table ep new_clause;
-    new_clause
+    Hashtbl.add equality_proof_table ep new_c;
+    new_c
 
 let is_simplification_rewrite pr =
   match pr with
@@ -436,9 +438,9 @@ let get_whole_and_sub_formulas cv =
   | None -> assert false
   | Some _ -> assert false
 
-let rec visit_formula_proof form =
-  if Hashtbl.mem formula_table form then Hashtbl.find formula_table form else
-    let new_clause =
+let rec walk_formula_proof form =
+  if Hashtbl.mem formula_proof_table form then Hashtbl.find formula_proof_table form else
+    let new_c =
       (match form with
       (* | Tautology (f, _) -> visit_formula f *)
        | Asserted (f) ->
@@ -450,7 +452,7 @@ let rec visit_formula_proof form =
          r
        | Equality (fp, ep) ->
          deb "Equality BEG";
-         let fproof_clause = visit_formula_proof fp in
+         let fproof_clause = walk_formula_proof fp in
          (* let imm_clause = lmkOther (ImmBuildDef2 fproof_clause) None in
           * link fproof_clause imm_clause; *)
          let ep_cl = visit_equality_proof ep fproof_clause in
@@ -473,72 +475,45 @@ let rec visit_formula_proof form =
          retval
        | Split (fp, f, rule) ->
          deb "Split BEG";
-         let unsplit_clause = visit_formula_proof fp in
+         let unsplit_clause = walk_formula_proof fp in
          let retval = translate_split unsplit_clause rule in
          deb "Split END";
          retval) in
-    Hashtbl.add formula_table form new_clause;
-    new_clause
+    Hashtbl.add formula_proof_table form new_c;
+    new_c
 (* let hack_replace_atom_op a op = *)
 
 
-let rec hack_replace_level1_by_op f op =
-  pp_form (Form.pform f);
-  match Form.pform f with
-  (* | Fatom formu -> hack_replace_level1_by_op formu op *)
-  | Fapp (fo, _) ->
-    negate_formula (Fapp (fo, Array.of_list [op; op]))
-let do_args_appear_in_eq eq a b =
-  begin match eq with
-    | Abop (_, x, y) when x == a && y == b->
-      (* print_string "\n finds true1"; *)
-      true
-    | Abop (_, y, x) when x == a && y == b->
-      (* print_string "\n finds true2"; *)
-      true
-    | _ ->
-      (* print_string "\n finds false"; *)
-      false end
-let pair_to_option a b ns =
-  begin let finds = List.find_all (fun fatom ->
-      (* pp_form (Form.pform fatom);
-       * print_string "\npait_to_option";
-       * Atom.to_smt Format.std_formatter a;
-       * Atom.to_smt Format.std_formatter b; *)
-      let Fatom atom = Form.pform fatom in
-      let aatom = Atom.atom atom in
-      do_args_appear_in_eq aatom a b) ns in
-    match finds with
-    | [nf] ->
-      print_string "\nfinds Some";
-      Some nf
-    | _ ->
-      print_string "\nfinds None";
-      None end 
 
-let generate_subpath_from_arg f (raw_ns: SmtAtom.Form.t list) =
-  let ns = raw_ns in
-  let f_pos = Form.pform f in
-  let Fatom (raw_atom) = f_pos in
-  (* let hatom = Atom.get VeritSyntax.ra raw_atom in *)
-  (* Atom.to_smt Format.std_formatter raw_atom; *)
-  let Abop(_, l, r) = Atom.atom raw_atom in
-  let Aapp (_, lhs) = Atom.atom l in
-  (* Array.iter (fun x -> Atom.to_smt Format.std_formatter x) lhs; *)
-  let Aapp (_, rhs) = Atom.atom r in
-  (* Array.iter (fun x -> Atom.to_smt Format.std_formatter x) rhs; *)
-  (* print_string ("\nfinds " ^ (string_of_int (Array.length lhs))); *)
-  Array.map2 (fun x y -> pair_to_option x y ns) lhs rhs 
+let generate_subpath f negated_equalities_fs =
+  let wrap_equality_formula_in_option hatom1 hatom2 hatoms =
+    let do_hatoms_appear_in_atomic_binary_operation atom hatom1 hatom2 =
+      match atom with
+      | Abop (_, x, y) when x == hatom1 && y == hatom2 -> true
+      | Abop (_, x, y) when x == hatom2 && y == hatom1 -> true
+      | _ -> false in
+    let matching_hatoms = List.find_all (fun gpform ->
+        let Fatom hatom = Form.pform gpform in
+        let atom = Atom.atom hatom in
+        do_hatoms_appear_in_atomic_binary_operation atom hatom1 hatom2) hatoms in
+    match matching_hatoms with
+    | [inequalitiy_hatom] -> Some inequalitiy_hatom
+    | _ -> None in
+  let gpform = Form.pform f in
+  let Fatom (atom) = gpform in
+  let Abop(_, left_atom, right_atom) = Atom.atom atom in
+  let Aapp (_, hatoms1) = Atom.atom left_atom in
+  let Aapp (_, hatoms2) = Atom.atom right_atom in
+  Array.map2 (fun x y -> wrap_equality_formula_in_option x y negated_equalities_fs) hatoms1 hatoms2 
 
 
-(* TODO Add transitivity *)
 let handle_lemma = function
   | L_CC_Congruence (f, ns)->
     if (isBooleanEquality f)
     then (assert false)
     else
       deb "handle_lemma CC_Cong BEG";
-      let nfs = generate_subpath_from_arg f ns in
+      let nfs = generate_subpath f ns in
       let nfs = Array.to_list nfs in
       let lemma_cl = lmkOther (EqCgr (f, nfs)) None in
       deb "handle_lemma CC_Cong END";
@@ -547,25 +522,26 @@ let handle_lemma = function
     if (isBooleanEquality f)
     then (assert false)
     else
-      let nfs = generate_subpath_from_arg f ns in
+      let nfs = generate_subpath f ns in
       (* let nfs = List.map (fun (Some x) -> x) (List.filter isSome (Array.to_list nfs)) in *)
       let lemma_cl = lmkOther (EqTr (f, ns)) None in
       lemma_cl
 
-let rec visit_clause_proof  (f : Prooftree_ast.clause_proof) : SmtAtom.Form.t SmtCertif.clause =
-  (* print_string "\npt_to_smtcoq: visit_clause_proof: Begin"; *)
-  if Hashtbl.mem clause_table f then Hashtbl.find clause_table f else
-    let new_clause =
-      (match f with
+let rec walk_clause_proof  cp =
+  if Hashtbl.mem clause_proof_table cp
+  then Hashtbl.find clause_proof_table cp
+  else
+    let new_c =
+      (match cp with
        | Resolution (cp1, cp2) ->
-         (* print_string "\n---- RESO!"; *)
-         let (cl1 : SmtAtom.Form.t SmtCertif.clause) = visit_clause_proof cp1 in
-         let cl2 = visit_clause_proof cp2 in
-         let res = lmkRes cl1 cl2 [] in
+         (* deb "Resolution BEG"; *)
+         let c1 = walk_clause_proof cp1 in
+         let c2 = walk_clause_proof cp2 in
+         let res = lmkRes c1 c2 [] in
+         (* deb "Resolution END"; *)
          res
-       | Clause (fp, f) ->
-         (* print_string "\n----- handle_clause: will return root!"; *)
-         visit_formula_proof fp
+       | Clause (fp, _) ->
+         walk_formula_proof fp
        | Lemma l -> handle_lemma l) in
-    Hashtbl.add clause_table f new_clause;
-    new_clause
+    Hashtbl.add clause_proof_table cp new_c;
+    new_c

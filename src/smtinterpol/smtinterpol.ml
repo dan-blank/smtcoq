@@ -2,7 +2,7 @@ open SmtAtom
 open SmtCertif
 open Tabulation
 open Smtlib_to_proofrules
-open Proofrules_to_clauses
+module C = Proofrules_to_clauses
 open Smtlib2_ast
 open Format
 
@@ -147,20 +147,20 @@ let import_trace fsmt fproof =
   let prooftree = walk_clause_proof xy in
 
   Printf.printf "\n Translating proofrules to clauses ...";
-  let certif_after_translation = visit_clause_proof prooftree in
+  let certif_after_translation = C.walk_clause_proof prooftree in
 
   Printf.printf "\n Linking roots and clauses together ...";
-  add_roots_and_non_roots();
+  C.add_roots_and_non_roots();
 
   Printf.printf "\n Calling select ...";
-  let certif = get_last (List.hd !clauses) in
+  let certif = C.get_last (List.hd !C.clauses) in
   SmtTrace.select certif;
   
   Printf.printf "\n Calling occur ...";
   SmtTrace.occur certif;
   
   Printf.printf "\n Calling alloc ...";
-  let max_id = SmtTrace.alloc (get_first certif) in
+  let max_id = SmtTrace.alloc (C.get_first certif) in
   print_certif Form.to_smt Atom.to_smt certif ".cert_debug";
   (max_id, certif)
 

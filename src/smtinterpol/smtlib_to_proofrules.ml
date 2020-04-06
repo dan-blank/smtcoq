@@ -54,7 +54,7 @@ let rec walk_equality_proof term =
 (**
    Walk an SMTLib term that represents a formula proof, return the IR equivalent.
 *)
-let rec walk_fproof term =
+let rec walk_formula_proof term =
   let handle_split_annotation = function
     | ":xor-1" -> Split_xor_1
     | ":xor-2" -> Split_xor_2
@@ -64,12 +64,12 @@ let rec walk_fproof term =
     let f = walk_formula ft in
     Asserted f
   | "@split", [TermExclimationPt (_, fpt, sa); ft] ->
-    let fp = walk_fproof fpt in
+    let fp = walk_formula_proof fpt in
     let f = walk_formula ft in
     let a = handle_split_annotation (string_of_single_atttribute sa) in
     Split (fp, f, a)
   | "@eq", [fpt; ept] ->
-    let fp = walk_fproof fpt in
+    let fp = walk_formula_proof fpt in
     let ep = walk_equality_proof ept in
     Equality (fp, ep)
 
@@ -119,7 +119,7 @@ let rec walk_clause_proof term =
     let cp :: cps = List.map discard_clause_annotation cpts in
     List.fold_left (fun acc new_cp -> Resolution (acc, new_cp)) cp cps
   | "@clause", [fpt; ft] ->
-    let fp = walk_fproof fpt in
+    let fp = walk_formula_proof fpt in
     let f = walk_formula ft in
     Clause (fp, f)
   | "@lemma", [TermExclimationPt (_, lt, (_, la))] -> Lemma (construct_lemma lt la)
