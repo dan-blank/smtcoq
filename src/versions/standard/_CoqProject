@@ -129,18 +129,11 @@ zchaff/zchaffParser.ml
 zchaff/zchaffParser.mli
 
 smtinterpol/smtinterpol_util.ml
-smtinterpol/modified_smtlib2_printing.ml
 smtinterpol/smtinterpol.ml
 smtinterpol/prooftree_ast.ml
 smtinterpol/smtlib_to_proofrules.ml
 smtinterpol/proofrules_to_clauses.ml
 smtinterpol/tabulation.ml
-smtinterpol/smtinterpolParser.ml
-smtinterpol/smtinterpolParser.mli
-smtinterpol/smtinterpolLexer.ml
-smtinterpol/smtinterpolLexer.mli
-smtinterpol/smtinterpolSyntax.ml
-smtinterpol/smtinterpolSyntax.mli
 
 cnf/Cnf.v
 

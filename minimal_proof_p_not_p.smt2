@@ -1,7 +1,0 @@
-(set-option :produce-proofs true)
-(set-logic QF_UF)
-(declare-fun t () Bool)
-(assert t)
-(assert (not t))
-(check-sat)
-(get-proof)

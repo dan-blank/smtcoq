@@ -34,7 +34,6 @@ type formula_proof =
 type lemma =
   | L_CC_Transitivity of formula * formula list
   | L_CC_Congruence of formula * formula list
-  (* | L_CC_Congruence of formula *)
 
 type clause_proof =
   | Resolution        of clause_proof * clause_proof
