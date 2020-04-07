@@ -259,6 +259,48 @@ A more efficient version of this tactic, called `cvc4_no_check`,
 performs only the check at `Qed`. (Thus it is safe, but a proof may fail
 at `Qed` even if everything went through during proof elaboration.)
 
+##### Checking SMTInterpol answers of unsatisfiability and importing theorems
+
+The current working directory is assumed to be `smtcoq/src/smtinterpol/proofs/`. To check the result given by SMTInterpol on the unsatisfiable SMT-LIB2 example file `or.smt2`:
+
+- Produce a smtinterpol proof witness:
+
+```coq
+java -jar path-to-smtinterpol/smtinterpol.jar or.smt2
+```
+which will produce the following input on the console:
+
+```coq
+success
+success
+success
+success
+success
+success
+success
+INFO - Assertion made context inconsistent
+success
+unsat
+(@res (@clause (@split (! (@eq (@asserted (= x y)) (@rewrite (! (= (= x y) (not (xor x y))) :eqToXor))) :xor-2) (or (not x) y)) (! (or (not x) y) :input)) (! (@clause (@asserted x) (! x :input)) :pivot x) (! (@clause (@asserted (not y)) (! (not y) :input)) :pivot (not y)))
+```
+
+- Create the proof witness file `or.proof` containing the proof witness portion of the consoles output. In our example, this portion is the following SMT-LIB2 term:
+
+```coq
+(@res (@clause (@split (! (@eq (@asserted (= x y)) (@rewrite (! (= (= x y) (not (xor x y))) :eqToXor))) :xor-2) (or (not x) y)) (! (or (not x) y) :input)) (! (@clause (@asserted x) (! x :input)) :pivot x) (! (@clause (@asserted (not y)) (! (not y) :input)) :pivot (not y)))
+```
+
+- In a Coq file `or.v`, put:
+
+```coq
+Require Import SMTCoq.SMTCoq.
+Section File.
+  Smtinterpol_Checker "or.smt2" "or.proof".
+End File.
+```
+
+- Compile `or.v`: `coqc or.v`. If it returns `true` then SMTInterpol
+  indeed proved that the problem "or.smt2" was unsatisfiable.
 
 ### The smt tactic
 

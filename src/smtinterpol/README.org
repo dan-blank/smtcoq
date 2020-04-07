@@ -1,0 +1,65 @@
+This extension integrates SMTInterpol into SMTCoq. So far, the extension covers only the vernacular 'checker' for some SMTInterpol proofs.
+
+* Getting Started 
+
+SMTCoq: For installing instructions, see [[../../INSTALL.md]].
+
+SMTInterpol: To install SMTInterpol, consult its README file. 
+
+* Usage
+
+Described in [[../../README.md]] in section 'Checking SMTInterpol answers of unsatisfiability and importing theorems'.
+
+The folder [[./proofs/]] contains example proofs that can already be checked.
+
+* Components
+
+** smtinterpol.ml
+   
+   This module ties together all modules of this extension and interfaces to the rest of SMTCoq.
+ 
+** ir.ml
+   
+   An intermediate representation for SMTInterpol proofs.
+
+** tabulation.ml
+
+   Preprocesses the smtlib term that represents the SMTInterpol proof.
+
+** smtlib_to_ir.ml
+
+   Translates smtlib terms to the intermediate representation.
+
+** ir_to_clauses.ml
+
+   Translates the intermediate representation to the SMTCoq proof format.
+
+** smtinterpol_util.ml
+
+   A collection of utility functionalities such as SMT-LIB2 manipulation, pretty printing etc.
+
+* Glossary
+
+** General terms
+
+   Ir = intermediate representation
+
+** values of type Smtlib2_ast
+
+   t = term
+   ept = equality proof term
+   fpt = formula proof term
+   apt = application term
+   ant = annotated term
+   an = annotation (correctly: an Smtlib2_ast.attribute)
+   ft = formula term
+
+** values of type Ir
+
+   ep = equality proof
+   fp = formula proof
+   l = lemma
+
+** values of type SmtCertif.clause
+
+   c = clause
