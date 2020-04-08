@@ -4,166 +4,124 @@ open SmtForm
 open SmtTrace
 open SmtCertif
 
+(**
+   Final step in the translation, where the intermediate representation is translated to a certificate.
+*)
+
+(** A table to cache translated clause proofs. *)
 let clause_proof_table : (Ir.clause_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+(** A table to cache translated equality proofs. *)
 let equality_proof_table : (Ir.equality_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
+(** A table to cache translated formula proofs. *)
 let formula_proof_table : (Ir.formula_proof, SmtAtom.Form.t clause) Hashtbl.t = Hashtbl.create 17
 
-let clauses : SmtAtom.Form.t clause list ref = ref []
+(** List of clauses that have the SmtCertif.clause_kind Root. *)
 let roots : SmtAtom.Form.t clause list ref = ref []
+(** List of clauses that do not have the SmtCertif.clause_kind Root. *)
+let clauses : SmtAtom.Form.t clause list ref = ref []
 
-let print_latest_clause () =
-  let get_last_id ls = if (0 != List.length ls) then (List.hd (List.rev ls)).id else (-1) in
-  (* let get_last_id ls = List.length ls in *)
-  let last = max (get_last_id !clauses) (get_last_id !roots) in
-  Printf.printf " last clause or root: %i" last
 
-let deb s =
-  Printf.printf "\n §§§ %s" s;
+(** Debugging function, print the id of the clause that was generated last along with a string argument. *)
+(* let deb message = () *)
+let deb message =
+  let print_latest_clause () =
+    let get_last_id ls = if (0 != List.length ls) then (List.hd (List.rev ls)).id else (-1) in
+    let last = max (get_last_id !clauses) (get_last_id !roots) in
+    Printf.printf " last clause: %i" last in
+  Printf.printf "\n §§§ %s" message;
   print_latest_clause ()
 
-let isSome option =
-  match option with
-  | None -> false
-  | _ -> true
-
+(** Helper to get the first clause of a certificate. *)
 let rec get_first c =
   match c.prev with
   | Some p -> get_first p
   | None -> c
 
+(** Helper to get the last clause of a certificate. *)
 let rec get_last c =
   match c.next with
   | Some n -> get_last n
   | None -> c
 
-let rec adjust_root_pos_values c pos =
-  let new_pos = pos + 1 in
-  if (isRoot c.kind) then c.pos <- Some (pos + 1);
-  match c.next with
-  | Some n -> adjust_root_pos_values n new_pos
-  | None -> ()
-
-let form_op_to_string = function
-  | Ftrue -> "Ftrue"
-  | Ffalse -> "Ffalse"
-  | Fand -> "Fand"
-  | For -> "For"
-  | Fxor -> "Fxor"
-  | Fimp -> "Fimp"
-  | Fiff -> "Fiff"
-  | Fite -> "Fite"
-  | Fnot2 (i)-> "Fnot2" ^ (string_of_int i)
-  | _ -> "Not supported yet"
-
-(* let pp_form_op op = Printf.printf (form_op_to_string op) *)
-
-let rec pp_form = function
-  | Fatom (a) ->
-    Printf.printf "(";
-    Printf.printf "Fatom ";
-    Atom.to_smt Format.std_formatter a;
-    Printf.printf ")"
-  | Fapp (fop, farray) ->
-    Printf.printf "(";
-    Printf.printf "Fapp ";
-    Printf.printf "%s" (form_op_to_string fop);
-    Array.iter (fun f -> pp_form (Form.pform f)) farray;
-    Printf.printf ")"
-
-(* let visit_formula = function
- *   | _ -> SmtTrace.mkRoot *)
-
-(* Get subformula OR return the atom *)
-let get_subformula f i =
-  let formula = Form.pform f in
+(** Given a formula with the constructor Fapp and an integer n, return the nth argument to Fapp. *)
+let get_subformula form index =
+  let formula = Form.pform form in
   match formula with
-  | Fapp (_, ar) -> Array.get ar i
-  (* | Fatom form -> f *)
+  | Fapp (_, ar) -> Array.get ar index
 
-let get_subformula_raw f i =
-  let formula = f in
-  match formula with
-  | Fapp (_, ar) -> Array.get ar i
+(** Check whether a formula is a boolean equality as opposed to an atomic equality. *)
+let isBooleanEqualityInLemma f = false
 
-let negate_formula f =
-  let reif = Form.create () in
-  let formula = Form.get reif f in 
-  SmtAtom.Form.neg (formula)
-
-let mkResV c1 c2 tl v =
-  (* Printf.printf "\mmkResV-------------"; *)
-  match v with | (Some vs) -> List.iter (fun t -> pp_form (Form.pform t)) vs;
-  mk_scertif (Res { rc1 = c1; rc2 = c2; rtail = tl }) v
-
-(* TODO Hack: for now, lemmas are always assumed to be atomic equalities*)
-let isBooleanEquality f = false
-
-let isPredicateFormula f = assert false
-
-let isFunctionFormula f = assert false
-
+(** Check whether a formula is one that applies an operator to subformulas. *)
 let isLogicalOperatorFormula f =
   let form_pos = Form.pform f in
   match form_pos with
   | Fapp (_, _) -> true 
   | _           -> false
 
-let link_list_of_clauses ls =
-  match ls with
-  | [] -> ()
-  | h :: tl -> let _ = List.fold_left (fun l r -> link l r; r) h tl in ()
-
+(** Add the two clause lists roots and clauses together by linking them together in the correct order and adjusting the clause.pos value of the root clauses. *)
 let add_roots_and_non_roots () =
+  let rec adjust_root_positions c pos =
+    let new_pos = pos + 1 in
+    if (isRoot c.kind) then c.pos <- Some (pos + 1);
+    match c.next with
+    | Some n -> adjust_root_positions n new_pos
+    | None -> ()in
   clauses := List.append !roots !clauses;
-  link_list_of_clauses !clauses;
-  adjust_root_pos_values (List.hd !clauses) (-1)
+  let (head_c :: tail_cs) = !clauses in
+  let _ = List.fold_left (fun l r -> link l r; r) head_c tail_cs in
+  adjust_root_positions (List.hd !clauses) (-1)
 
-
-let lmkOther split_rule value =
-  let clause = mkOther split_rule value in
+(** Wrapper to store a newly created clause with kind Other into clauses. *)
+let lmkOther rule value =
+  let clause = mkOther rule value in
   clauses := List.append !clauses [clause];
   clause
 
+
+(** Wrapper to store a newly created clause with kind Res into clauses. *)
 let lmkRes r l tl =
   let clause = mkRes r l tl in
   clauses := List.append !clauses [clause];
   clause
 
+(** Wrapper to store a newly created clause with kind Res and a value into clauses. *)
+let mkResV c1 c2 tl v = mk_scertif (Res { rc1 = c1; rc2 = c2; rtail = tl }) v
 let lmkResV r l tl v =
   let clause = mkResV r l tl v in
   clauses := List.append !clauses [clause];
   clause
 
+(** Wrapper to store a newly created clause with kind Root and a value into roots. *)
 let lmkRootV v =
   let clause = mkRootV v in
   roots := List.append !roots [clause];
-  (* clauses := List.append !clauses [clause]; *)
   clause
 
+(** Two convenience functions to build clauses of kind Other with either BuildDef or BuildDef2. *)
 let aux_bd1 f = lmkOther (BuildDef f) None
 let aux_bd2 f = lmkOther (BuildDef2 f) None
 
+(** Given two formulas, build a new formula that is the equality between the two input formulas. *)
 let mkEquality f g =
   let form_pos = Fapp (Fiff, Array.of_list [f; g]) in
   Form.get VeritSyntax.rf form_pos
 
-let isTrueFop fapp =
-  match fapp with
-  | Fapp (Ftrue, _) ->
-    (* assert false; *)
-    true
+(** Check whether a given formula is of kind (= x true). The symetric case is not yet accounted for. *)
+let isEqualToTrueFormula f =
+  let isTrueFormula fapp =
+    match fapp with
+    | Fapp (Ftrue, _) -> true
+    | _ -> false in
+  match Form.pform (get_subformula f 1) with
+  | Fapp (Fiff, far) -> isTrueFormula (Form.pform (Array.get far 1))
   | _ -> false
 
-let isTrueEqIntern f =
-  let r_sub = Form.pform (get_subformula f 1) in
-  match r_sub with
-  | Fapp (Fiff, far) ->
-    let pot_true = Array.get far 1 in
-    isTrueFop (Form.pform pot_true)
-  | _ -> false
-
-(* TODO consider symmetric case*)
-let create_intern_true_eq (iixt : SmtAtom.Form.t) =
+(**
+   Given a formula of kind (= x (= x true)), return the clause { (= x (= x true)) }.
+   The symetric cases are not covered yet.
+*)
+let create_intern_true_eq iixt =
   deb "create_intern_true_eq BEG";
   let ixt = get_subformula iixt 1 in
   let iixt_x_nixt = aux_bd2 iixt in
@@ -174,132 +132,99 @@ let create_intern_true_eq (iixt : SmtAtom.Form.t) =
   let iixt_nixt_ntrue = lmkRes iixt_nx_nixt nixt_x_ntrue [] in
   let iixt_ntrue = lmkRes iixt_ixt_ntrue iixt_nixt_ntrue [] in
   let cl_true = lmkOther True None in
-  let iixt = lmkResV iixt_ntrue cl_true [] (Some [iixt]) in
+  let iixt_c = lmkResV iixt_ntrue cl_true [] (Some [iixt]) in
   deb "create_intern_true_eq END";
-  iixt
+  iixt_c
 
-(* Given a boolean equality, return a clause that proves it.*)
-let handle_rewrite_bool rewritee_clause rewrite_rule rewrite_formula =
-  (* let lhs_raw = get_subformula_raw rewrite_formula 0 in *)
-  let rcl = mkRootV [rewrite_formula] in
-  (* print_certif Form.to_smt Atom.to_smt rcl ".cert_debug2"; *)
-  let lhs = get_subformula rewrite_formula 0 in
-  let rhs = get_subformula rewrite_formula 1 in
+(**
+   Given a clause, a rewrite rule and a rewrite formula, produce a certificate whose last clause proves the rewritten clause.
+   So far, this only works for rewriting on the formula level, no on the atomic level.
+
+   Examples:
+   handle_rewrite_bool _ Rewrite_eqToXor (= (= x y) (not (xor x y)))
+       => { (= (= x y) (not (xor x y))) }
+   handle_rewrite_bool { (not (not x)) } Rewrite_notSimp _
+       => { x }
+*)
+let handle_rewrite_bool hackForRewrite_c rewrite_rule rewrite_f =
+  let left_f = get_subformula rewrite_f 0 in
+  let right_f = get_subformula rewrite_f 1 in
   match rewrite_rule with
    | Rewrite_eqToXor ->
-     let base_pos = lmkOther (BuildDef2 rewrite_formula) None in
-     Printf.printf "\n# translate_rewrite eqToXor first %i" base_pos.id;
-     let base_neg = lmkOther (BuildDef rewrite_formula) None in
+     let base_pos = lmkOther (BuildDef2 rewrite_f) None in
+     let base_neg = lmkOther (BuildDef rewrite_f) None in
      (* Resolve to (iff a b) x (not y) *)
-     let choose_nx_y_1 = lmkOther (BuildDef (Form.neg lhs)) None in
-     let choose_nx_y_2 = lmkOther (BuildDef (Form.neg rhs)) None in
+     let choose_nx_y_1 = lmkOther (BuildDef (Form.neg left_f)) None in
+     let choose_nx_y_2 = lmkOther (BuildDef (Form.neg right_f)) None in
      let res_nx_y = lmkRes base_pos choose_nx_y_1 [choose_nx_y_2] in
      (* Resolve to (iff a b) x y *)
-     let choose_x_y_1 = lmkOther (BuildDef2 lhs) None in
-     let choose_x_y_2 = lmkOther (BuildDef rhs) None in
+     let choose_x_y_1 = lmkOther (BuildDef2 left_f) None in
+     let choose_x_y_2 = lmkOther (BuildDef right_f) None in
      let res_x_y = lmkRes base_neg choose_x_y_1 [choose_x_y_2] in
      (* Resolve to (iff a b) x *)
      let res_x = lmkRes res_x_y res_nx_y [] in
-
      (* Resolve to (iff a b) (not x) (not y) *)
-     let choose_x_ny_1 = lmkOther (BuildDef lhs) None in
-     let choose_x_ny_2 = lmkOther (BuildDef2 rhs) None in
+     let choose_x_ny_1 = lmkOther (BuildDef left_f) None in
+     let choose_x_ny_2 = lmkOther (BuildDef2 right_f) None in
      let res_x_ny = lmkRes base_neg choose_x_ny_1 [choose_x_ny_2] in
      (* Resolve to (iff a b) (not x) y *)
-     let choose_nx_ny_1 = lmkOther (BuildDef2 (Form.neg lhs)) None in
-     let choose_nx_ny_2 = lmkOther (BuildDef2 (Form.neg rhs)) None in
+     let choose_nx_ny_1 = lmkOther (BuildDef2 (Form.neg left_f)) None in
+     let choose_nx_ny_2 = lmkOther (BuildDef2 (Form.neg right_f)) None in
      let res_nx_ny = lmkRes base_pos choose_nx_ny_1 [choose_nx_ny_2] in
      (* Resolve to (iff a b) (not x) *)
      let res_nx = lmkRes res_x_ny res_nx_ny [] in
-
-     let res = lmkResV res_x res_nx [] (Some [rewrite_formula]) in
-     (* Printf.printf "\n# translate_rewrite eqToXor last %i" res.id; *)
+     let res = lmkResV res_x res_nx [] (Some [rewrite_f]) in
      res
-     (* clauses := List.append !clauses [base_pos; base_neg; choose_nx_y_1; choose_nx_y_2; res_nx_y; choose_x_y_1; choose_x_y_2; res_x_y; res_x; choose_x_ny_1; choose_x_ny_2; res_x_ny; choose_nx_ny_1; choose_nx_ny_2; res_nx_ny; res_nx; res]; *)
    | Rewrite_andToOr ->
-     let base_1 = lmkOther (BuildDef2 rewrite_formula) None in
-     Printf.printf "\n# translate_rewrite andToOr first %i" base_1.id;
+     let base_1 = lmkOther (BuildDef2 rewrite_f) None in
      (* Resolve to (iff a b) x *)
-     let prod_and_1 = lmkOther (BuildProj (lhs, 0)) None in
-     let prod_or_1 = lmkOther (BuildProj (rhs, 0)) None in
+     let prod_and_1 = lmkOther (BuildProj (left_f, 0)) None in
+     let prod_or_1 = lmkOther (BuildProj (right_f, 0)) None in
      let res_x = lmkRes base_1 prod_and_1 [prod_or_1] in
      (* Resolve to (iff a b) y *)
-     let prod_and_2 = lmkOther (BuildProj (lhs, 1)) None in
-     let prod_or_2 = lmkOther (BuildProj (rhs, 1)) None in
+     let prod_and_2 = lmkOther (BuildProj (left_f, 1)) None in
+     let prod_or_2 = lmkOther (BuildProj (right_f, 1)) None in
      let res_y = lmkRes base_1 prod_and_2 [prod_or_2] in
      (* Resolve to (iff a b) (not x) (not y) *)
-     let base2 = lmkOther (BuildDef rewrite_formula) None in
-     let sum_and = lmkOther (BuildDef lhs) None in
-     let sum_or = lmkOther (BuildDef rhs) None in
+     let base2 = lmkOther (BuildDef rewrite_f) None in
+     let sum_and = lmkOther (BuildDef left_f) None in
+     let sum_or = lmkOther (BuildDef right_f) None in
      let res_nx_ny = lmkRes base2 sum_and [sum_or] in
      (* Resolve to (iff a b) *)
-     let res = lmkResV res_nx_ny res_x [res_y] (Some [rewrite_formula]) in
-     (* Printf.printf "\n# translate_rewrite andToOr last %i" res.id; *)
+     let res = lmkResV res_nx_ny res_x [res_y] (Some [rewrite_f]) in
      res
-   (* TODO Rewrite_notSimp has to return an iff formula. *)
    | Rewrite_notSimp ->
-     let simpl1 = lmkOther (ImmFlatten (rewritee_clause, rhs)) rewritee_clause.value in
-     (* Printf.printf "\n# translate_rewrite notSimpl %i" simpl1.id; *)
-     pp_form (Form.pform lhs);
-     if (Form.equal lhs rhs) then Printf.printf "\n lhs and rhs are equal!";
+     let simpl1 = lmkOther (ImmFlatten (hackForRewrite_c, right_f)) hackForRewrite_c.value in
      simpl1
-   (* TODO Rewrite_intern has to return an iff formula. *)
    | Rewrite_intern ->
-     if (isTrueEqIntern rewrite_formula)
-     then (create_intern_true_eq rewrite_formula) 
+     if (isEqualToTrueFormula rewrite_f)
+     then (create_intern_true_eq rewrite_f) 
      else (
        deb "Rewrite_intern true eq BEG";
-     let formula_l = get_subformula rewrite_formula 0 in
-     let formula_r = get_subformula rewrite_formula 1 in
+     let formula_l = get_subformula rewrite_f 0 in
+     let formula_r = get_subformula rewrite_f 1 in
      let refl_formula = mkEquality formula_l formula_r in
      let na = aux_bd1 refl_formula in
      let a = aux_bd2 refl_formula in
      let refl_cl = lmkResV na a [] (Some [refl_formula]) in
      deb "Rewrite_intern true eq END";
      refl_cl)
-  
-let handle_rewrite_nonbool _ = assert false
 
-let translate_rewrite rewritee_clause rewrite_rule rewrite_formula =
-  (* Printf.printf "\n translate_rewrite: formula "; *)
-  (* Form.to_smt Atom.to_smt Format.std_formatter rewrite_formula; *)
-  if (isLogicalOperatorFormula rewrite_formula)
-  then handle_rewrite_bool rewritee_clause rewrite_rule rewrite_formula
-  else handle_rewrite_nonbool rewritee_clause rewrite_rule rewrite_formula
+(**
+   Given a clause, a rewrite rule and a rewrite formula, produce a certificate whose last clause proves the rewritten clause.
+   This wrapper makes sure that the rewrite happens on the formula level. Rewrite on the atomic level are not supported.
 
-
-
-let translate_split unsplit_clause split_rule =
-  match split_rule with
-  | Split_xor_2 -> 
-    let split_clause = lmkOther (ImmBuildDef2 unsplit_clause) None in
-    split_clause
-  | Split_notOr ->
-    (*  TODO: remove hardcoded index... need to detect correct index instead *)
-    let split_clause = lmkOther (ImmBuildProj (unsplit_clause, 1)) None in
-    split_clause
-
-let handle_refl_bool dummy = assert false
-let handle_ref_nonbool dummy = assert false
-let translate_refl dummy = assert false
-
-let handle_cong_bool dummy = assert false
-let handle_cong_nonbool dummy = assert false
-let translate_cong f cs = assert false
-
-let handle_trans_bool dummy = assert false
-let handle_trans_nonbool dummy = assert false
-let translate_trans f ts = assert false
-
-
-(*
-Input: l = (not x) r = y
-   TODO proper
+   hackForRewrite_c is a clause that was proven before and that is potentially being rewritten by the current rewrite. This can be necessary if the SMTCoq construct for the rewrite needs a clause as an argument.
 *)
+let handle_rewrite hackForRewrite_c rewrite_rule rewrite_f =
+  if (isLogicalOperatorFormula rewrite_f)
+  then handle_rewrite_bool hackForRewrite_c rewrite_rule rewrite_f
+  else assert false 
+
+
+(** Create the congruence clause for the logical operator 'not'.*)
 let create_congruent_not x y =
   deb "create_congruent_clause_not BEG";
-  assert (not (Form.is_neg x));
-  assert (not (Form.is_neg y));
   let inxny = mkEquality (Form.neg x) (Form.neg y) in
   let nixy = Form.neg (mkEquality x y) in
   let inxny_x_y = aux_bd1 inxny in
@@ -312,17 +237,24 @@ let create_congruent_not x y =
   deb "create_congruent_clause_not END";
   res
 
-let create_congruent_clause f equalities =
+(** Given a congruence in the form of an equality and a list of negated equalities, return a clause that proves that congruence.  *)
+let create_congruent f equalities =
   match f, equalities with
-  (* Special case: negation is not represented as an Fop in SMTCoq. *)
+  (* Special case: negation is not represented as an Fop in SMTCoq, so we have to have to check for that case in a different way. *)
   | f, [e] when (Form.is_neg f) -> create_congruent_not (Form.neg f) e
   | _ -> assert false
 
-(* TODO a b c positiv negativ? *)
-let create_transitive_clause_not a b c =
-  deb "create_transitive_clause_not BEG";
-  (* This derivation only works when a, b and c are distinct.
-  For example, if a and b were equal, then niab_a_nb would evaluate to true (since then nb = na and { (na a) } == { true })*)
+(**
+   Given a transitivity in the form of three formulas a,b and c, return a clause that proves that transitivity.
+
+   This derivation will produce potentially problematic clauses when a, b and c are not distinct:
+   Consider the clause 'niab_a_nb': If a and b were equal, then niab_a_nb would evaluate to true (since then nb = na and { (na a) } == { true }.
+
+   Example:
+   create_transitive  x y z => { (= x z) (not (= x y)) (not (= y z)) }
+*)
+let create_transitive a b c =
+  deb "create_transitive  BEG";
   assert (not (a == b));
   assert (not (b == c));
   assert (not (a == c));
@@ -340,30 +272,33 @@ let create_transitive_clause_not a b c =
   let iac_na_nc = aux_bd1 iac in
   let niab_nibc_iac_na = lmkRes niab_nibc_na_c iac_na_nc [] in
   let res = lmkResV niab_nibc_iac_a niab_nibc_iac_na [] (Some [iac; niab; nibc]) in
-  deb "create_transitive_clause_not END";
+  deb "create_transitive  END";
   res
 
-
-let rec visit_equality_proof ep proven_c =
+(**
+   Walk an equality proof and return the equivalent certificate.
+   The purpose of hackForRewrite_c is explained in the comment of 'handle_rewrite'.
+*)
+let rec walk_equality_proof ep hackForRewrite_c =
   if Hashtbl.mem equality_proof_table ep
   then Hashtbl.find equality_proof_table ep
   else
     let c =
     (match ep with
-      | Rewrite (form, split_rule) ->
+      | Rewrite (form, rewrite_rule) ->
         deb "Rewrite BEG";
-        let c = translate_rewrite proven_c split_rule form in
+        let c = handle_rewrite hackForRewrite_c rewrite_rule form in
         deb "Rewrite END";
         c
       | Congruence (lep, rep) ->
         deb "Congruence BEG";
-        let c1 = visit_equality_proof lep proven_c in
-        let c2 = visit_equality_proof rep proven_c in
+        let c1 = walk_equality_proof lep hackForRewrite_c in
+        let c2 = walk_equality_proof rep hackForRewrite_c in
         let (Some [form1]) = (get_last c1).value in
         let (Some [form2]) = (get_last c2).value in
         let sub1_form = get_subformula form1 1 in
         let sub2_form = get_subformula form2 1 in
-        let cong_cl_raw = create_congruent_clause sub1_form [sub2_form] in
+        let cong_cl_raw = create_congruent sub1_form [sub2_form] in
         let (Some [cong_formula; _]) = (get_last cong_cl_raw).value in
         let cong_cl = lmkResV c2 cong_cl_raw [] (Some [cong_formula]) in
         let cong_sub0 = get_subformula cong_formula 0 in
@@ -371,7 +306,7 @@ let rec visit_equality_proof ep proven_c =
         let l_sub0 = get_subformula form1 0 in
         if ((Form.equal cong_sub0 cong_sub1) && (Form.equal cong_sub0 l_sub0))
         then (
-          let trans_cl_raw = create_transitive_clause_not l_sub0 cong_sub0 cong_sub1 in
+          let trans_cl_raw = create_transitive  l_sub0 cong_sub0 cong_sub1 in
           let res1 = lmkRes trans_cl_raw c1 [] in
           let res = lmkRes res1 cong_cl [] in
           deb "Congruence END";
@@ -382,8 +317,8 @@ let rec visit_equality_proof ep proven_c =
           res)
       | Transitivity (lep, rep) ->
         deb "Transitivity BEG";
-        let c1 = visit_equality_proof lep proven_c in
-        let c2 = visit_equality_proof rep proven_c in
+        let c1 = walk_equality_proof lep hackForRewrite_c in
+        let c2 = walk_equality_proof rep hackForRewrite_c in
         let (Some [form1]) = (get_last c1).value in
         let (Some [form2]) = (get_last c2).value in
         let a = get_subformula form1 0 in
@@ -409,8 +344,26 @@ let rec visit_equality_proof ep proven_c =
     Hashtbl.add equality_proof_table ep c;
     c
 
+(**
+   Given a unit clause with a formula to be split, a split rule and a formula that should result after the split, return a clause that proves that the split formula.
 
+   There is a small mismatch between how splitting works in SMTInterpol and SMTCoq: The former just mentions the split rule and the resulting formula, the later needs the clause with the formula to be split and optionally a index that tells where the split should happen.
+*)
+let handle_split unsplit_clause split_rule form =
+  let deduce_split_index heap_form needle_form =
+    let first_sub_form = get_subformula heap_form 0 in
+    if Form.pform first_sub_form = Form.pform needle_form then 0 else 1 in
+  match split_rule with
+  | Split_xor_2 -> 
+    let split_clause = lmkOther (ImmBuildDef2 unsplit_clause) None in
+    split_clause
+  | Split_notOr ->
+    let Some [unsplit_formula] = unsplit_clause.value in
+    let index = deduce_split_index unsplit_formula form in
+    let split_clause = lmkOther (ImmBuildProj (unsplit_clause, index)) None in
+    split_clause
 
+(** Walk an formula proof and return the equivalent certificate. *)
 let rec walk_formula_proof fp =
   if Hashtbl.mem formula_proof_table fp
   then Hashtbl.find formula_proof_table fp
@@ -423,27 +376,36 @@ let rec walk_formula_proof fp =
       | Equality (fp, ep) ->
         (* deb "Equality BEG"; *)
         let x_c = walk_formula_proof fp in
-        let ixy_c = visit_equality_proof ep x_c in
+        let ixy_c = walk_equality_proof ep x_c in
         let c = (match ep with
             | Rewrite (_, Rewrite_notSimp) -> ixy_c
             | _ ->
               let nx_y_c = lmkOther (ImmBuildDef2 ixy_c) ixy_c.value in (* Check: ixy_c.value is not the correct value! *)
-              let y_c = lmkRes nx_y_c x_c [] in
+              let Some [form] = ixy_c.value in
+              let y_c = lmkResV nx_y_c x_c [] (Some [get_subformula form 1]) in
               y_c) in
         (* deb "Equality END"; *)
         c
       | Split (fp, f, split_rule) ->
         (* deb "Split BEG"; *)
         let c1 = walk_formula_proof fp in
-        let c2 = translate_split c1 split_rule in
+        let c2 = handle_split c1 split_rule f in
         (* deb "Split END"; *)
         c2) in
     Hashtbl.add formula_proof_table fp last_c;
     last_c
 
 
-(*
-   purpose: Wrap the right equalities in "Some", potentially generate missing equalities (e.g. (= x x))
+(**
+   Make sure that SMTInterpol gave the correct inequalities for a transitivity or congruence and wrap them into the form that SMTCoq requires.
+   This is only intended for atomic congruence/transivity.
+   SMTInterpol does not give trivial inequalities, i.e. (not (= x x)). This might be problematic, maybe those inequalities have to be generated by oneself.
+
+   Example:
+   (= (a x) (a y)) (not (= x y)) => one-element-array of Some (not (= x y))
+     where
+       a is some atomic operator
+       = is some atomic equality
 *)
 let generate_subpath form negated_equality_forms =
   let wrap_equality_formula_in_option hatom1 hatom2 hatoms =
@@ -466,24 +428,23 @@ let generate_subpath form negated_equality_forms =
   let Aapp (_, hatoms2) = Atom.atom right_atom in
   Array.map2 (fun x y -> wrap_equality_formula_in_option x y negated_equality_forms) hatoms1 hatoms2 
 
-
+(** Given a lemma, produce a equivalent clause. *)
 let handle_lemma = function
   | L_CC_Congruence (form, negated_equality_forms)->
-    if (isBooleanEquality form)
+    if (isBooleanEqualityInLemma form)
     then (assert false)
     else
-      (* deb "handle_lemma CC_Cong BEG"; *)
       let option_wrapped_forms = generate_subpath form negated_equality_forms in
       let lemma_c = lmkOther (EqCgr (form, Array.to_list option_wrapped_forms)) None in
-      (* deb "handle_lemma CC_Cong END"; *)
       lemma_c
   | L_CC_Transitivity (form, negated_equality_forms) ->
-    if (isBooleanEquality form)
+    if (isBooleanEqualityInLemma form)
     then (assert false)
     else
       let lemma_c = lmkOther (EqTr (form, negated_equality_forms)) None in
       lemma_c
 
+(** Walk an formula proof and return the equivalent certificate. *)
 let rec walk_clause_proof  cp =
   if Hashtbl.mem clause_proof_table cp
   then Hashtbl.find clause_proof_table cp

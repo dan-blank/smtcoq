@@ -226,12 +226,9 @@ and 'hform clause = {
     mutable used  : used;
     mutable prev  : 'hform clause option;
     mutable next  : 'hform clause option;
-    mutable value : 'hform list option;
+    mutable value : 'hform list option
               (* This field should be defined for rules which can create atoms :
                  EqTr, EqCgr, EqCgrP, Lia, Dlde, Lra *)
-    (* TODO delete both fields *)
-    mutable iffval : 'hform option;
-    mutable eqval : 'hform option
   }
 
 and 'hform clause_kind =

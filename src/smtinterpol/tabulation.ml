@@ -2,52 +2,30 @@ open Smtlib2_ast
 open Format
 open Smtinterpol_util
 
-(* TODO
-   X check for further inlining
-   X revisit newly created terms
-   commenting function
-   variable names
-   module purpose
-   import
-
+(**
+   Preprocess an SMTInterpol proof, eliminating let terms and simplifying s-expressions.
 *)
 
-(* This table contains terms that result from tabulating the initial SMTInterpol proof. It contains no let terms and no SexprInParens.   *)
+(** This table contains terms that result from tabulating the initial SMTInterpol proof. It contains no let terms and no SexprInParens.   *)
 let term_table : (string, term) Hashtbl.t = Hashtbl.create 17 
 
-(* A counter to ensure that terms in term_table introduced by attributes have a unique name. *)
-let attribute_counter = ref 0
-
-(******************************************************************************)
-(* Helper functions.                                                          *)
-(******************************************************************************)
-
-
-
-(******************************************************************************)
-(* Tabulate functions that visit values defined in SmtLib2_ast.                *)
-(******************************************************************************)
-
-
+(** A counter to ensure that terms in term_table encoded in attributes have a unique name. *)
+let counter = ref 0
 
 (** Transform an sexpr into a term and return the symbol that represents that term in term_table. *)
 let rec sexpr_to_term sexpr =
-  let attribute_counter_string = string_of_int !attribute_counter in
-  incr attribute_counter;
-  let fresh_attribute_symbol_string = String.concat "" [".ats" ; attribute_counter_string] in
+  print_sexpr Format.str_formatter sexpr;
+  let transformed_sexpr = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string (flush_str_formatter ())) in
+  let fresh_name = String.concat "" [".ats" ; string_of_int !counter] in
+  incr counter;
   let dummyloc = (Lexing.dummy_pos, Lexing.dummy_pos) in
-  let fresh_attribute_symbol () = Symbol (dummyloc, fresh_attribute_symbol_string) in
+  let fresh_attribute_symbol () = Symbol (dummyloc, fresh_name) in
   let fresh_attribute_sexpr () = SexprSymbol (dummyloc, fresh_attribute_symbol ()) in
-  let strformater = Format.str_formatter in
-  print_sexpr strformater sexpr;
-  let sexpr_string = flush_str_formatter () in
-  let transformed_sexpr = Smtlib2_parse.term Smtlib2_lex.token (Lexing.from_string sexpr_string) in
   let SexprSymbol(l, s) = fresh_attribute_sexpr () in
   Hashtbl.add term_table (string_of_symbol s) (tabulate_term transformed_sexpr);
   SexprSymbol(l,s)
 
-(** Given an attribute value that contains sexprs that represent terms, add those terms to term_table and replace their
-sexpr representation with the symbol that map to the term in term_table. *)
+(** Given an attribute value that contains sexprs representing terms, add those terms to term_table and replace their sexpr representation with the symbol that map to the term in term_table. *)
 and tabulate_attribute_value_sexpr =
   let tabulate_sexprs_in_paren (SexprInParen (l1, (l2, sexpr))) = SexprInParen (l1, (l2, List.map sexpr_to_term sexpr)) in
   function
@@ -89,9 +67,8 @@ and tabulate_term = function
     let tabulated_attributes = List.map tabulate_attribute al in
     TermExclimationPt (loc, tabulated_subterm, (loc2, tabulated_attributes))
 
-(* Given a tuple of a String keyword and a sexpr attribute-value, transform any term in that attribute-value into a symbol. Any term transformed this way is put into the termtable. Return an attribute-value where every occurrence of an term is replaced by the corresponding symbol.*)
 
-(* Given an proof of type term, create two tables containg the preprocessed terms and term lists. *)
+(** Given an proof of type term, create two tables containg the preprocessed terms and term lists. *)
 let tabulate_proof proof =
   let main_term = tabulate_term proof in
   Hashtbl.add term_table ".mainproof" main_term

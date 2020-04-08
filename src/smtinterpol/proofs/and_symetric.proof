@@ -1,0 +1,11 @@
+(@res
+ (@clause
+  (@eq
+   (@split
+    (!
+     (@eq (@asserted (and x y)) (@rewrite (! (= (and x y) (not (or (not x) (not y)))) :andToOr)))
+     :notOr)
+    (not (not x)))
+   (@rewrite (! (= (not (not x)) x) :notSimp)))
+  (! x :input))
+ (! (@clause (@asserted (not x)) (! (not x) :input)) :pivot (not x)))

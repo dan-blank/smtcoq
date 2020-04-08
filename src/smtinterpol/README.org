@@ -1,4 +1,4 @@
-This extension integrates SMTInterpol into SMTCoq. So far, the extension covers only the vernacular 'checker' for some SMTInterpol proofs.
+This extension integrates SMTInterpol into SMTCoq. So far, the extension covers the vernacular 'checker' for some SMTInterpol proofs.
 
 * Getting Started 
 

@@ -3,10 +3,12 @@
      ((.cse1 (or (not x) y)))
    (@clause
     (@split
-     (! (let ((.cse0 (= x y)))
+     (!
+      (let ((.cse0 (= x y)))
           (@eq
            (@asserted .cse0)
-           (@rewrite (! (= .cse0 (not (xor x y))) :eqToXor)))) :xor-2) .cse1)
+           (@rewrite (! (= .cse0 (not (xor x y))) :eqToXor))))
+      :xor-2) .cse1)
     (! .cse1 :input)))
  (! (@clause (@asserted x) (! x :input)) :pivot x)
  (let ((.cse2 (not y))) (! (@clause (@asserted .cse2) (! .cse2 :input)) :pivot .cse2)))

@@ -35,9 +35,7 @@ let mk_scertif kind ov =
    used = notUsed;
    prev = None;
    next = None;
-   value = ov;
-   eqval = None;
-   iffval = None;
+   value = ov
  }
 
 (** Roots *)
@@ -52,9 +50,7 @@ let mkRootGen ov =
    used = notUsed;
    prev = None;
    next = None;
-   value = ov;
-   eqval = None;
-   iffval = None;
+   value = ov
  }
 
 let mkRoot  = mkRootGen None
