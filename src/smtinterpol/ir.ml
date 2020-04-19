@@ -13,8 +13,10 @@ type rewrite_rule =
   | Rewrite_intern
 
 type split_rule =
-  | Split_xor_1
-  | Split_xor_2
+  | Split_xor_minus_1
+  | Split_xor_minus_2
+  | Split_xor_plus_1
+  | Split_xor_plus_2
   | Split_notOr
 
 type equality_proof =

@@ -354,7 +354,10 @@ let handle_split unsplit_clause split_rule form =
     let first_sub_form = get_subformula heap_form 0 in
     if Form.pform first_sub_form = Form.pform needle_form then 0 else 1 in
   match split_rule with
-  | Split_xor_2 -> 
+  | Split_xor_plus_1 | Split_xor_minus_1 ->
+    let split_clause = lmkOther (ImmBuildDef unsplit_clause) None in
+    split_clause
+  | Split_xor_plus_2 | Split_xor_minus_2 -> 
     let split_clause = lmkOther (ImmBuildDef2 unsplit_clause) None in
     split_clause
   | Split_notOr ->
